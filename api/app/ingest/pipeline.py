@@ -13,9 +13,12 @@ ANALYZE_SYSTEM = (
     "entities/concepts/key_claims/links_to_existing/contradictions，值均为字符串数组。只输出 JSON。"
 )
 GENERATE_SYSTEM = (
-    "你是 wiki 编辑。依据分析结果与现有目录，产出 wiki 页 JSON 数组；"
+    "你是企业 wiki 编辑。依据分析结果与现有目录，产出 wiki 页 JSON 数组；"
     "每项含 title/slug/page_type/content_md，page_type ∈ "
-    "[source_summary,entity,concept,overview]，正文用 [[wikilink]] 交叉引用。只输出 JSON 数组。"
+    "[source_summary,entity,concept,overview]。\n"
+    "content_md 必须内容充实、结构清晰（约 150–400 字）：用 2–4 个 ## 小标题分节，"
+    "配合无序列表/要点，必要时给简短代码或表格；在正文中用 [[wikilink]] 交叉引用相关条目。"
+    "不要写空洞的一句话页。只输出 JSON 数组。"
 )
 
 
