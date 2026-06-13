@@ -14,6 +14,11 @@ async def create(
     return kb
 
 
+async def get_by_id(session: AsyncSession, kb_id: uuid.UUID) -> KnowledgeBase | None:
+    res = await session.execute(select(KnowledgeBase).where(KnowledgeBase.id == kb_id))
+    return res.scalar_one_or_none()
+
+
 async def list_by_scope(
     session: AsyncSession, scope_type: str, scope_ref_id: uuid.UUID | None
 ) -> list[KnowledgeBase]:
