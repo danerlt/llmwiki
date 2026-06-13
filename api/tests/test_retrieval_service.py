@@ -2,6 +2,13 @@ import pytest_asyncio
 
 from app.repositories import kb_repo, org_repo, wiki_repo
 from app.services import org_service, retrieval_service
+from app.services.retrieval_service import _query_terms, make_snippet
+
+
+def test_make_snippet_centers_on_match():
+    text = "前言部分。后端使用 FastAPI 构建高性能接口，配合数据库。结尾部分。"
+    snip, matched = make_snippet(text, _query_terms("FastAPI"), width=24)
+    assert "FastAPI" in snip and matched.lower() == "fastapi"
 
 
 @pytest_asyncio.fixture

@@ -19,6 +19,11 @@ class SourceRef(BaseModel):
     filename: str
 
 
+class SearchHit(PageOut):
+    snippet: str = ""
+    matched: str = ""
+
+
 class PageDetailOut(PageOut):
     content_md: str
     frontmatter: dict

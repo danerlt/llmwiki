@@ -13,6 +13,21 @@ _CJK_RE = re.compile(r"[一-鿿]+")
 _STOP = set("的了是有哪些么什怎如和与吗呢在对为及或请问个这那你我他它将被把")
 
 
+def make_snippet(text: str, terms: list[str], width: int = 160) -> tuple[str, str]:
+    """围绕首个命中词截取一段摘要，返回 (摘要, 命中词)。无命中则取开头。"""
+    if not text:
+        return "", ""
+    low = text.lower()
+    for t in terms:
+        i = low.find(t.lower())
+        if i >= 0:
+            start = max(0, i - width // 4)
+            seg = text[start : start + width].replace("\n", " ").strip()
+            return ("…" if start > 0 else "") + seg + ("…" if start + width < len(text) else ""), t
+    seg = text[:width].replace("\n", " ").strip()
+    return seg + ("…" if len(text) > width else ""), ""
+
+
 def _query_terms(q: str) -> list[str]:
     """把查询切成检索词：ASCII 词（>=2）+ 中文相邻二元组（无分词器时的中文召回兜底）。
     自然语言整句不再当作单一子串，从而能召回相关页。"""
