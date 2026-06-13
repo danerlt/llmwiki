@@ -41,9 +41,10 @@
 - 🚧 安全/运维中间件：✅安全响应头 ✅CORS ✅request_id 贯穿 / ⬜限流(rate limit) ⬜TrustedHost
 - ✅ 全局异常处理（统一错误体，不泄漏堆栈/SQL，带 request_id）✅ 结构化日志 + 请求访问日志（method/path/status/dur + request_id）
 - ✅ 深度健康检查：`/health`(存活) + `/readyz`(探 DB/Redis/MinIO 就绪，任一不通 503)
-- ✅ Prometheus `/metrics`（进程内请求量 + 延迟聚合）/ ⬜ 队列积压 + LLM 调用计量
+- ✅ Prometheus `/metrics`（请求量 + 延迟 + LLM 调用数/token 计量）/ ⬜ 队列积压
 - 🚧 列表接口统一分页：✅审计(envelope+总数+动作过滤+加载更多) / ⬜ pages/sources（受 KB 体量约束，暂留）
-- ⬜ LLM 网关健壮化：超时分级 + 重试退避 + 熔断 + token 计量（在阶段 1 瞬时重试基础上扩展）
+- ✅ LLM 网关健壮化：可配超时 + 429/5xx/超时指数退避重试 + 4xx 不重试 + token 计量 / ⬜ 熔断
+- ⬜ API 限流（rate limit）
 
 ### 阶段 3：内容创作与版本（Confluence/Notion 对标，最大产品缺口）🚧
 **目标**：让人能直接创建/编辑/删除页与查看历史——当前页面只能由 LLM 摄入生成，这是对标产品的头号缺口。
