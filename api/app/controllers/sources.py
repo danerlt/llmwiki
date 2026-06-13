@@ -10,7 +10,7 @@ from app.integrations.storage import MinioStorage, StorageBackend
 from app.models import User
 from app.repositories import kb_repo, source_repo
 from app.schemas.source import SourceCreatedOut, SourceOut
-from app.services import permission_service
+from app.services import audit_service, permission_service
 from app.worker.queue import enqueue_ingest
 
 router = APIRouter(tags=["sources"])
@@ -66,6 +66,11 @@ async def upload_source(
     storage_key = f"{kb_id}/{src.id}/{src.filename}"
     storage.put(storage_key, data, src.content_type)
     src.storage_key = storage_key
+    await audit_service.record(
+        session, actor_id=user.id, action="source.upload",
+        target_type="source", target_id=src.id,
+        detail={"kb_id": str(kb_id), "filename": src.filename},
+    )
     # 先持久化 source（worker 出队时必可见），再入队，消除“提交前入队”竞态
     await session.commit()
 

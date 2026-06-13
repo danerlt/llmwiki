@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.models import PromotionRequest, User
 from app.repositories import kb_repo, wiki_repo
 from app.schemas.promotion import PromotionCreate, PromotionOut, ReviewDecision
-from app.services import promotion_service
+from app.services import audit_service, promotion_service
 
 router = APIRouter(tags=["reviews"])
 
@@ -39,6 +39,10 @@ async def promote(
         pr = await promotion_service.request_promotion(
             session, user, page_id, body.to_kb_id, note=body.note
         )
+        await audit_service.record(
+            session, actor_id=user.id, action="promotion.request",
+            target_type="page", target_id=page_id, detail={"to_kb_id": str(body.to_kb_id)},
+        )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except LookupError as e:
@@ -63,6 +67,10 @@ async def approve(
 ):
     try:
         pr = await promotion_service.approve(session, user, pr_id)
+        await audit_service.record(
+            session, actor_id=user.id, action="promotion.approve",
+            target_type="promotion", target_id=pr_id,
+        )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except LookupError as e:
@@ -80,6 +88,10 @@ async def reject(
 ):
     try:
         pr = await promotion_service.reject(session, user, pr_id, note=body.note)
+        await audit_service.record(
+            session, actor_id=user.id, action="promotion.reject",
+            target_type="promotion", target_id=pr_id,
+        )
     except PermissionError as e:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
     except LookupError as e:
