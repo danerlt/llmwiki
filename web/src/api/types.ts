@@ -60,3 +60,13 @@ export interface PromotionOut {
   status: string;
   note: string | null;
 }
+export interface AuditEventOut {
+  id: string;
+  actor_id: string;
+  actor_email: string;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  detail: Record<string, unknown> | null;
+  created_at: string;
+}

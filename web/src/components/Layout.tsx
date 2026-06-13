@@ -20,9 +20,14 @@ export default function Layout() {
           审核
         </Link>
         {user?.role === "admin" && (
-          <Link to="/admin" className="text-slate-600 hover:text-slate-900">
-            管理
-          </Link>
+          <>
+            <Link to="/admin" className="text-slate-600 hover:text-slate-900">
+              管理
+            </Link>
+            <Link to="/audit" className="text-slate-600 hover:text-slate-900">
+              审计
+            </Link>
+          </>
         )}
         <div className="ml-auto flex items-center gap-3 text-sm">
           <span className="text-slate-500">
