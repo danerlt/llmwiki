@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import delete, select
+from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import PageLink, WikiPage
@@ -73,3 +73,48 @@ async def backfill_link_targets(session: AsyncSession, *, kb_id: uuid.UUID) -> N
     )
     for link in res.scalars().all():
         link.to_page_id = slug_to_id.get(link.to_slug)
+
+
+async def search_pages(
+    session: AsyncSession, kb_ids: list[uuid.UUID], q: str, limit: int = 20
+) -> list[WikiPage]:
+    """可移植关键词召回：标题/正文子串匹配（lower+LIKE），排除 index，标题命中排前。"""
+    if not kb_ids or not q:
+        return []
+    pattern = f"%{q.lower()}%"
+    title_match = func.lower(WikiPage.title).like(pattern)
+    body_match = func.lower(WikiPage.content_md).like(pattern)
+    stmt = (
+        select(WikiPage)
+        .where(
+            WikiPage.kb_id.in_(kb_ids),
+            WikiPage.page_type != "index",
+            or_(title_match, body_match),
+        )
+        .order_by(title_match.desc())
+        .limit(limit)
+    )
+    res = await session.execute(stmt)
+    return list(res.scalars().all())
+
+
+async def linked_pages(
+    session: AsyncSession, from_page_ids: list[uuid.UUID]
+) -> list[WikiPage]:
+    """种子页经 page_links 直接链接、且已回填 to_page_id 的目标页。"""
+    if not from_page_ids:
+        return []
+    stmt = (
+        select(WikiPage)
+        .join(PageLink, PageLink.to_page_id == WikiPage.id)
+        .where(PageLink.from_page_id.in_(from_page_ids), PageLink.to_page_id.is_not(None))
+    )
+    res = await session.execute(stmt)
+    return list(res.scalars().unique().all())
+
+
+async def list_by_kbs(session: AsyncSession, kb_ids: list[uuid.UUID]) -> list[WikiPage]:
+    if not kb_ids:
+        return []
+    res = await session.execute(select(WikiPage).where(WikiPage.kb_id.in_(kb_ids)))
+    return list(res.scalars().all())
