@@ -1,5 +1,6 @@
 import json
 
+import pytest
 import pytest_asyncio
 
 from app.models import KnowledgeBase, User
@@ -100,6 +101,22 @@ async def test_failure_sets_status_failed(session, kb_and_source):
     assert refreshed.status == "failed"
     # #7: 不把异常原文（可能含 SQL/存储路径/密钥）透传给用户，只存稳定脱敏码
     assert refreshed.error and "llm down" not in refreshed.error
+
+
+async def test_transient_failure_reraises_for_retry(session, kb_and_source):
+    """瞬时故障(上游 LLM 抖动)应写 failed 并【重新抛出】，让 arq 走 max_tries 重试。"""
+    import httpx
+
+    kb, src, storage = kb_and_source
+
+    class FlakyLLM:
+        async def complete(self, system, user):
+            raise httpx.ConnectError("connection refused")
+
+    with pytest.raises(httpx.ConnectError):
+        await ingest_service.ingest_source(session, src.id, llm=FlakyLLM(), storage=storage)
+    refreshed = await source_repo.get_by_id(session, src.id)
+    assert refreshed.status == "failed" and refreshed.error == "llm_unavailable"
 
 
 async def test_failure_after_flush_still_sets_failed(session, kb_and_source, monkeypatch):

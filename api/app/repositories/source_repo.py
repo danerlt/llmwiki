@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Source
@@ -40,6 +40,21 @@ async def set_status(
     if src is not None:
         src.status = status
         src.error = error
+
+
+async def claim(session: AsyncSession, source_id: uuid.UUID) -> bool:
+    """原子认领：把非 processing 的源置为 processing 并清空错误；已在 processing 则返回 False。
+
+    依赖 UPDATE ... WHERE status != 'processing' 的行级锁实现并发去重——
+    两个 job 同时认领同一 source 时，后者会阻塞至前者提交，再因条件不满足而认领失败，
+    避免双写同一 (kb_id, slug) 触发唯一约束冲突。
+    """
+    res = await session.execute(
+        update(Source)
+        .where(Source.id == source_id, Source.status != "processing")
+        .values(status="processing", error=None)
+    )
+    return (res.rowcount or 0) > 0
 
 
 async def set_job_id(session: AsyncSession, source_id: uuid.UUID, job_id: str) -> None:

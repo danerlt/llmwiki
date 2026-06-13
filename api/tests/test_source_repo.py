@@ -30,6 +30,22 @@ async def test_create_get_and_status_flow(session):
     assert refreshed.status == "failed" and refreshed.error == "boom"
 
 
+async def test_claim_dedups_concurrent_processing(session):
+    kb, u = await _kb_user(session)
+    src = await source_repo.create(
+        session, kb_id=kb.id, uploader_id=u.id, filename="a.md",
+        content_type="text/markdown", storage_key="k", status="failed",
+    )
+    await source_repo.set_status(session, src.id, "failed", error="boom")
+    await session.flush()
+    # 首次认领成功：failed → processing，并清空错误
+    assert await source_repo.claim(session, src.id) is True
+    refreshed = await source_repo.get_by_id(session, src.id)
+    assert refreshed.status == "processing" and refreshed.error is None
+    # 已在 processing → 二次认领失败（并发去重）
+    assert await source_repo.claim(session, src.id) is False
+
+
 async def test_list_by_kb(session):
     kb, u = await _kb_user(session)
     await source_repo.create(

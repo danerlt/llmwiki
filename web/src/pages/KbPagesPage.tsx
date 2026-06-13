@@ -36,12 +36,14 @@ export default function KbPagesPage() {
   const fileRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | null>(null);
   const pollingRef = useRef(false);
-  const cancelledRef = useRef(false);
+  // 记录当前激活的 kbId；每个请求只在自己的 kbId 仍是当前时才写状态，
+  // 杜绝切换知识库时旧请求回调把 X 的数据写进正在显示 Y 的组件（跨 KB 串台）。
+  const activeKbRef = useRef(kbId);
 
   function loadPages() {
     apiFetch<PageOut[]>(`/kbs/${kbId}/pages`)
       .then((p) => {
-        if (!cancelledRef.current) setPages(p);
+        if (activeKbRef.current === kbId) setPages(p);
       })
       .catch(() => setErr("加载页面失败"));
   }
@@ -50,7 +52,7 @@ export default function KbPagesPage() {
   function loadSources() {
     apiFetch<SourceOut[]>(`/kbs/${kbId}/sources`)
       .then((list) => {
-        if (cancelledRef.current) return;
+        if (activeKbRef.current !== kbId) return;
         setSources(list);
         if (timerRef.current) {
           clearTimeout(timerRef.current);
@@ -68,15 +70,17 @@ export default function KbPagesPage() {
   }
 
   useEffect(() => {
-    cancelledRef.current = false;
+    activeKbRef.current = kbId;
     loadPages();
     loadSources();
     apiFetch<KB[]>("/kbs")
-      .then((ks) => setKbName(ks.find((k) => k.id === kbId)?.name ?? "知识库"))
+      .then((ks) => {
+        if (activeKbRef.current === kbId) setKbName(ks.find((k) => k.id === kbId)?.name ?? "知识库");
+      })
       .catch(() => {});
     return () => {
-      cancelledRef.current = true;
       if (timerRef.current) clearTimeout(timerRef.current);
+      pollingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kbId]);

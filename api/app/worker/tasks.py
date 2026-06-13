@@ -18,12 +18,9 @@ async def ingest_source(ctx: dict, source_id: str) -> None:
         bucket=settings.minio_bucket_sources,
         secure=settings.minio_secure,
     )
+    # ingest_service 自管状态提交（processing/done/failed）；瞬时故障会抛出，
+    # 透传给 arq 触发 max_tries 重试。
     async with SessionLocal() as session:
-        try:
-            await ingest_service.ingest_source(
-                session, uuid.UUID(source_id), llm=llm, storage=storage
-            )
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
+        await ingest_service.ingest_source(
+            session, uuid.UUID(source_id), llm=llm, storage=storage
+        )

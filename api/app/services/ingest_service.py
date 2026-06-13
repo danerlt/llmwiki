@@ -22,6 +22,12 @@ def _failure_code(exc: Exception) -> str:
     return type(exc).__name__
 
 
+def _is_transient(exc: Exception) -> bool:
+    """瞬时/可重试故障：上游 LLM(httpx) 或对象存储(minio) 抖动，重试可能成功；
+    解析错误/数据错误等视为永久失败，不重试。"""
+    return (type(exc).__module__ or "").split(".")[0] in {"httpx", "minio"}
+
+
 async def ingest_source(
     session: AsyncSession,
     source_id: uuid.UUID,
@@ -29,13 +35,19 @@ async def ingest_source(
     llm,
     storage: StorageBackend,
 ) -> None:
-    """确定性两步摄入：解析→分析→生成→落页→链接图→重建 index。失败置 failed。"""
+    """确定性两步摄入：认领→解析→分析→生成→落页→链接图→重建 index。
+
+    并发去重靠 source_repo.claim（同一 source 仅一个 job 处理，避免双写触发唯一约束冲突）；
+    processing 提前提交以对外可见并充当行级互斥；瞬时故障(LLM/存储抖动)重新抛出由 arq 重试，
+    永久故障写 failed 终态（脱敏错误码，完整异常仅进服务端日志）。
+    """
     src = await source_repo.get_by_id(session, source_id)
     if src is None:
         return
+    if not await source_repo.claim(session, source_id):
+        return  # 另一个 job 已认领该源，跳过
+    await session.commit()  # processing 落库：对外可见 + 行级互斥已生效
     try:
-        await source_repo.set_status(session, source_id, "processing")
-
         data = storage.get(src.storage_key)
         text = parser.parse_to_text(src.filename, src.content_type, data)
 
@@ -95,9 +107,13 @@ async def ingest_source(
         await wiki_repo.backfill_link_targets(session, kb_id=src.kb_id)
 
         await source_repo.set_status(session, source_id, "done")
+        await session.commit()
     except Exception as exc:  # noqa: BLE001 — 摄入失败要落库可观测
-        # 先回滚清掉失败/半成品事务（否则后续 SELECT 触发 PendingRollbackError、半成品页被提交），
-        # 再写 failed 终态；提交统一由调用方(worker tasks.py)负责
+        # 先回滚清掉半成品事务（否则后续 SELECT 触发 PendingRollbackError、半成品页被提交），
+        # 再写 failed 终态并提交。
         await session.rollback()
         _logger.exception("摄入失败 source_id=%s", source_id)  # 完整异常仅进服务端日志
         await source_repo.set_status(session, source_id, "failed", error=_failure_code(exc))
+        await session.commit()
+        if _is_transient(exc):
+            raise  # 瞬时故障：抛出让 arq 走 max_tries 重试（下次 claim 会重新认领 failed 源）
