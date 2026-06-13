@@ -1,7 +1,11 @@
+import re
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
 from app.services import retrieval_service
+
+_WIKILINK = re.compile(r"\[\[([^\]]+)\]\]")
 
 QUERY_SYSTEM = (
     "你是企业知识库问答助手。只依据给定编号资料回答，"
@@ -30,4 +34,6 @@ async def answer(
         answer_text = await llm.complete(QUERY_SYSTEM, user_prompt)
     except Exception:  # noqa: BLE001 — LLM 不可用时降级返回，仍带可见 KB 的引用，不裸 500
         return {"answer": "（问答服务暂不可用，请稍后重试）", "citations": citations}
+    # 去掉模型可能在答案里写的 [[双链]] 语法（前端答案区是纯文本渲染），保留可读文字
+    answer_text = _WIKILINK.sub(r"\1", answer_text)
     return {"answer": answer_text, "citations": citations}

@@ -52,3 +52,18 @@ async def test_answer_degrades_when_llm_fails(session):
     out = await query_service.answer(session, admin, "后端", llm=BoomLLM())
     assert "暂不可用" in out["answer"]  # 降级而非裸 500
     assert any(c["title"] == "后端" for c in out["citations"])  # 仍带可见 KB 的引用
+
+
+async def test_answer_strips_wikilink_syntax(session):
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="a2@x.com", password="pw123456", display_name="A", role="admin"
+    )
+    await session.flush()
+    await wiki_repo.upsert(session, kb_id=kb.id, slug="后端", title="后端",
+                           page_type="entity", content_md="服务端", frontmatter={}, source_ids=[])
+    await session.flush()
+    llm = FakeLLM(["后端用 [[FastAPI]] 与 [[数据库设计]] 开发[1]。"])
+    out = await query_service.answer(session, admin, "后端", llm=llm)
+    assert "[[" not in out["answer"] and "FastAPI" in out["answer"]  # 双链去壳，文字保留
