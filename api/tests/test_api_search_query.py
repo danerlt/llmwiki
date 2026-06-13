@@ -41,6 +41,17 @@ async def test_search_filters_inaccessible(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_query_rejects_overlong_question(session, client):
+    alice, _, _ = await _two_dept_kbs_with_pages(session)
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: alice
+    try:
+        r = await client.post("/api/query", json={"question": "问" * 2001})
+        assert r.status_code == 422  # 超长问题在边界拒绝，不放大下游 LLM 成本
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_query_returns_answer_and_citations(session, client):
     alice, backend_kb, frontend_kb = await _two_dept_kbs_with_pages(session)
     await session.commit()

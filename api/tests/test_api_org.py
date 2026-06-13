@@ -15,6 +15,16 @@ async def test_admin_can_create_department(client, session):
     assert r.json()["name"] == "技术部"
 
 
+async def test_overlong_name_rejected_as_422(client, session):
+    # 超过 DB 列长度的输入应在请求边界以 422 拒绝，而非穿透到 DB 抛 500
+    token = await _token(client, session, "admin")
+    r = await client.post(
+        "/api/departments", json={"name": "长" * 300},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert r.status_code == 422
+
+
 async def test_non_admin_forbidden(client, session):
     token = await _token(client, session, "user")
     r = await client.post("/api/departments", json={"name": "X"}, headers={"Authorization": f"Bearer {token}"})

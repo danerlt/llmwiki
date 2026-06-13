@@ -1,10 +1,10 @@
 import uuid
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, Field
 
 
 class DepartmentCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
     parent_id: uuid.UUID | None = None
 
 
@@ -17,7 +17,7 @@ class DepartmentOut(BaseModel):
 
 
 class TeamCreate(BaseModel):
-    name: str
+    name: str = Field(min_length=1, max_length=255)
 
 
 class TeamOut(BaseModel):
@@ -28,9 +28,9 @@ class TeamOut(BaseModel):
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
-    password: str
-    display_name: str
+    email: EmailStr = Field(max_length=320)
+    password: str = Field(min_length=8, max_length=128)
+    display_name: str = Field(min_length=1, max_length=255)
     role: str = "user"
     department_id: uuid.UUID | None = None
 

@@ -15,7 +15,7 @@ router = APIRouter(tags=["search"])
 
 @router.get("/search", response_model=list[SearchHit])
 async def search(
-    q: str = Query(...),
+    q: str = Query(..., min_length=1, max_length=500),
     kb: list[uuid.UUID] | None = Query(default=None),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),

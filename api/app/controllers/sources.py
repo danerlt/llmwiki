@@ -62,13 +62,17 @@ async def upload_source(
         raise HTTPException(
             status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="仅支持 .md/.txt/.pdf"
         )
-    data = await file.read()
+    # 分块读取并随读随校验大小：超限立即中止，避免把超大请求体整体读入内存/临时盘（DoS）
+    buf = bytearray()
+    while chunk := await file.read(1024 * 1024):
+        buf.extend(chunk)
+        if len(buf) > settings.max_upload_bytes:
+            raise HTTPException(
+                status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="file too large"
+            )
+    data = bytes(buf)
     if not data:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="empty file")
-    if len(data) > settings.max_upload_bytes:
-        raise HTTPException(
-            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="file too large"
-        )
     src = await source_repo.create(
         session,
         kb_id=kb_id,

@@ -155,6 +155,27 @@ async def test_reingest_forbidden_without_write(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_upload_rejects_oversize_file(session, client, monkeypatch):
+    from app.core.config import settings
+
+    user, kb = await _setup_user_kb(session)
+    await session.commit()
+    monkeypatch.setattr(settings, "max_upload_bytes", 16)  # 调低上限便于触发
+    app.dependency_overrides[sources_ctrl.get_storage] = lambda: FakeStorage()
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.post(
+            f"/api/kbs/{kb.id}/sources",
+            files={"file": ("a.md", b"x" * 100, "text/markdown")},
+        )
+        assert r.status_code == 413
+        # 超限在创建 source 之前就被拒，不留垃圾记录
+        assert await source_repo.list_by_kb(session, kb.id) == []
+    finally:
+        app.dependency_overrides.pop(sources_ctrl.get_storage, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_upload_rejects_empty_file(session, client):
     user, kb = await _setup_user_kb(session)
     await session.commit()
