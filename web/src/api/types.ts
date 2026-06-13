@@ -50,3 +50,13 @@ export interface AnswerOut {
   answer: string;
   citations: Citation[];
 }
+export interface PromotionOut {
+  id: string;
+  page_id: string;
+  page_title: string;
+  to_kb_id: string;
+  to_kb_name: string;
+  requested_by: string;
+  status: string;
+  note: string | null;
+}

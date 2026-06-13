@@ -16,6 +16,9 @@ export default function Layout() {
         <Link to="/query" className="text-slate-600 hover:text-slate-900">
           问答
         </Link>
+        <Link to="/reviews" className="text-slate-600 hover:text-slate-900">
+          审核
+        </Link>
         {user?.role === "admin" && (
           <Link to="/admin" className="text-slate-600 hover:text-slate-900">
             管理

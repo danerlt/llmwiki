@@ -9,6 +9,7 @@ import KbPagesPage from "./pages/KbPagesPage";
 import LoginPage from "./pages/LoginPage";
 import PageDetailPage from "./pages/PageDetailPage";
 import QueryPage from "./pages/QueryPage";
+import ReviewsPage from "./pages/ReviewsPage";
 import SearchPage from "./pages/SearchPage";
 
 export default function App() {
@@ -24,6 +25,7 @@ export default function App() {
             <Route path="/search" element={<SearchPage />} />
             <Route path="/query" element={<QueryPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/reviews" element={<ReviewsPage />} />
           </Route>
         </Route>
       </Routes>
