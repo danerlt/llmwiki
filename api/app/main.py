@@ -1,6 +1,6 @@
 from fastapi import FastAPI
 
-from app.controllers import auth, health, kb, org, sources
+from app.controllers import auth, health, kb, org, query, search, sources, wiki
 
 
 def create_app() -> FastAPI:
@@ -10,6 +10,9 @@ def create_app() -> FastAPI:
     app.include_router(org.router, prefix="/api")
     app.include_router(kb.router, prefix="/api")
     app.include_router(sources.router, prefix="/api")
+    app.include_router(search.router, prefix="/api")
+    app.include_router(query.router, prefix="/api")
+    app.include_router(wiki.router, prefix="/api")
     return app
 
 
