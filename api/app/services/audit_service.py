@@ -26,5 +26,14 @@ async def record(
     )
 
 
-async def list_recent(session: AsyncSession, limit: int = 100) -> list[AuditEvent]:
-    return await audit_repo.list_recent(session, limit)
+async def list_recent(
+    session: AsyncSession,
+    limit: int = 50,
+    offset: int = 0,
+    action: str | None = None,
+) -> list[AuditEvent]:
+    return await audit_repo.list_recent(session, limit=limit, offset=offset, action=action)
+
+
+async def count(session: AsyncSession, action: str | None = None) -> int:
+    return await audit_repo.count(session, action=action)

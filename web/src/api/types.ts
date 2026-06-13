@@ -88,6 +88,12 @@ export interface PromotionOut {
   status: string;
   note: string | null;
 }
+export interface Paginated<T> {
+  items: T[];
+  total: number;
+  limit: number;
+  offset: number;
+}
 export interface AuditEventOut {
   id: string;
   actor_id: string;

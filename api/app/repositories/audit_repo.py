@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import desc, select
+from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AuditEvent
@@ -26,8 +26,22 @@ async def create(
     return ev
 
 
-async def list_recent(session: AsyncSession, limit: int = 100) -> list[AuditEvent]:
-    res = await session.execute(
-        select(AuditEvent).order_by(desc(AuditEvent.created_at)).limit(limit)
-    )
+async def list_recent(
+    session: AsyncSession,
+    limit: int = 50,
+    offset: int = 0,
+    action: str | None = None,
+) -> list[AuditEvent]:
+    stmt = select(AuditEvent).order_by(desc(AuditEvent.created_at))
+    if action:
+        stmt = stmt.where(AuditEvent.action == action)
+    stmt = stmt.limit(limit).offset(offset)
+    res = await session.execute(stmt)
     return list(res.scalars().all())
+
+
+async def count(session: AsyncSession, action: str | None = None) -> int:
+    stmt = select(func.count()).select_from(AuditEvent)
+    if action:
+        stmt = stmt.where(AuditEvent.action == action)
+    return int((await session.execute(stmt)).scalar() or 0)
