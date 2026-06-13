@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import PageLink, WikiPage
+from app.models import PageLink, PageVersion, WikiPage
 
 
 async def get_by_slug(session: AsyncSession, kb_id: uuid.UUID, slug: str) -> WikiPage | None:
@@ -76,13 +76,54 @@ async def backfill_link_targets(session: AsyncSession, *, kb_id: uuid.UUID) -> N
 
 
 async def delete_page(session: AsyncSession, page_id: uuid.UUID) -> None:
-    """删除页及其相关链接（出链与入链），用于 reingest 清理孤儿页。"""
+    """删除页及其相关链接（出链与入链）与历史版本，用于 reingest 清理孤儿页与人工删除。"""
     await session.execute(
         delete(PageLink).where(
             or_(PageLink.from_page_id == page_id, PageLink.to_page_id == page_id)
         )
     )
+    await session.execute(delete(PageVersion).where(PageVersion.page_id == page_id))
     await session.execute(delete(WikiPage).where(WikiPage.id == page_id))
+
+
+async def add_version(
+    session: AsyncSession, page: WikiPage, edited_by: uuid.UUID | None = None
+) -> PageVersion:
+    """把页的【当前】状态快照为一个新版本（version_no 按页单调递增）。"""
+    res = await session.execute(
+        select(func.max(PageVersion.version_no)).where(PageVersion.page_id == page.id)
+    )
+    nxt = (res.scalar() or 0) + 1
+    v = PageVersion(
+        page_id=page.id,
+        version_no=nxt,
+        title=page.title,
+        page_type=page.page_type,
+        content_md=page.content_md or "",
+        edited_by=edited_by,
+    )
+    session.add(v)
+    return v
+
+
+async def list_versions(session: AsyncSession, page_id: uuid.UUID) -> list[PageVersion]:
+    res = await session.execute(
+        select(PageVersion)
+        .where(PageVersion.page_id == page_id)
+        .order_by(desc(PageVersion.version_no))
+    )
+    return list(res.scalars().all())
+
+
+async def get_version(
+    session: AsyncSession, page_id: uuid.UUID, version_no: int
+) -> PageVersion | None:
+    res = await session.execute(
+        select(PageVersion).where(
+            PageVersion.page_id == page_id, PageVersion.version_no == version_no
+        )
+    )
+    return res.scalar_one_or_none()
 
 
 async def search_pages(

@@ -41,6 +41,100 @@ async def test_get_page_detail_accessible(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def _admin_company_kb(session):
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="admin@x.com", password="pw123456", display_name="Admin", role="admin"
+    )
+    await session.commit()
+    return admin, kb
+
+
+async def test_create_edit_history_revert_flow(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        # 创建
+        r = await client.post(
+            f"/api/kbs/{kb.id}/pages",
+            json={"title": "手写页", "content_md": "第一版 [[相关]]", "page_type": "concept"},
+        )
+        assert r.status_code == 201
+        pid = r.json()["id"]
+        assert r.json()["content_md"] == "第一版 [[相关]]"
+
+        # 编辑
+        r2 = await client.put(f"/api/pages/{pid}", json={"content_md": "第二版"})
+        assert r2.status_code == 200 and r2.json()["content_md"] == "第二版"
+
+        # 历史：两个版本（v2 在前）
+        rv = await client.get(f"/api/pages/{pid}/versions")
+        assert rv.status_code == 200
+        vers = rv.json()
+        assert [v["version_no"] for v in vers] == [2, 1]
+        assert vers[1]["content_md"] == "第一版 [[相关]]"
+
+        # 回滚到 v1 → 内容回到第一版，且新增 v3
+        rr = await client.post(f"/api/pages/{pid}/revert/1")
+        assert rr.status_code == 200 and rr.json()["content_md"] == "第一版 [[相关]]"
+        rv2 = await client.get(f"/api/pages/{pid}/versions")
+        assert [v["version_no"] for v in rv2.json()] == [3, 2, 1]
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_create_page_forbidden_without_write(session, client):
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    user = await org_service.create_user(
+        session, email="u@x.com", password="pw123456", display_name="U", role="user"
+    )
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "X", "content_md": ""})
+        assert r.status_code == 403  # 普通用户无公司库写权限
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_create_page_duplicate_slug_conflict(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "X", "slug": "dup"})
+        r = await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "Y", "slug": "dup"})
+        assert r.status_code == 409
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_create_rejects_system_page_type(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        r = await client.post(
+            f"/api/kbs/{kb.id}/pages", json={"title": "X", "page_type": "index"}
+        )
+        assert r.status_code == 422  # 不可手工指定系统页类型
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_delete_page(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        pid = (
+            await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "待删", "slug": "del"})
+        ).json()["id"]
+        assert (await client.delete(f"/api/pages/{pid}")).status_code == 204
+        assert (await client.get(f"/api/pages/{pid}")).status_code == 404
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_get_page_hides_cross_kb_source_filenames(session, client):
     company = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
     await session.flush()

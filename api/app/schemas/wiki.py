@@ -1,7 +1,34 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
+
+# 人工可创建/编辑的页类型（index 目录、source_summary 源摘要为系统自动生成，不可手工指定）
+HUMAN_PAGE_TYPES = ("overview", "entity", "concept")
+
+
+class PageCreate(BaseModel):
+    title: str = Field(min_length=1, max_length=512)
+    slug: str | None = Field(default=None, max_length=512)
+    content_md: str = Field(default="", max_length=200_000)
+    page_type: str = Field(default="concept")
+
+
+class PageUpdate(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=512)
+    content_md: str | None = Field(default=None, max_length=200_000)
+    page_type: str | None = None
+
+
+class PageVersionOut(BaseModel):
+    version_no: int
+    title: str
+    page_type: str
+    content_md: str
+    edited_by: uuid.UUID | None = None
+    created_at: datetime
+
+    model_config = {"from_attributes": True}
 
 
 class PageOut(BaseModel):

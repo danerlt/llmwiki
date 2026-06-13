@@ -2,6 +2,7 @@ from app.models.audit_event import AuditEvent
 from app.models.department import Department
 from app.models.knowledge_base import KnowledgeBase
 from app.models.page_link import PageLink
+from app.models.page_version import PageVersion
 from app.models.promotion_request import PromotionRequest
 from app.models.source import Source
 from app.models.team import Team, UserTeam
@@ -13,6 +14,7 @@ __all__ = [
     "Department",
     "KnowledgeBase",
     "PageLink",
+    "PageVersion",
     "PromotionRequest",
     "Source",
     "Team",
