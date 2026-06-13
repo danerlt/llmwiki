@@ -9,6 +9,7 @@ class QueryRequest(BaseModel):
 
 
 class Citation(BaseModel):
+    index: int
     page_id: uuid.UUID
     title: str
     kb_id: uuid.UUID
