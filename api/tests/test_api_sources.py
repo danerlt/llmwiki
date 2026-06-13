@@ -51,6 +51,32 @@ async def test_upload_creates_pending_source(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_upload_enqueue_failure_marks_source_failed(session, client):
+    user, kb = await _setup_user_kb(session)
+    await session.commit()
+    app.dependency_overrides[sources_ctrl.get_storage] = lambda: FakeStorage()
+    app.dependency_overrides[get_current_user] = lambda: user
+    orig = sources_ctrl.enqueue_ingest
+
+    async def _boom(source_id: str) -> str:
+        raise RuntimeError("redis down")
+
+    sources_ctrl.enqueue_ingest = _boom
+    try:
+        r = await client.post(
+            f"/api/kbs/{kb.id}/sources",
+            files={"file": ("a.md", b"# hi", "text/markdown")},
+        )
+        assert r.status_code == 503
+        # 不会永久卡在 pending：置 failed 可重试
+        srcs = await source_repo.list_by_kb(session, kb.id)
+        assert len(srcs) == 1 and srcs[0].status == "failed"
+    finally:
+        sources_ctrl.enqueue_ingest = orig
+        app.dependency_overrides.pop(sources_ctrl.get_storage, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_upload_forbidden_without_write(session, client):
     # 普通 user 对 company KB 无写权限
     user, kb = await _setup_user_kb(session, role="user")

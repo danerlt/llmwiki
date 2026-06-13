@@ -97,7 +97,9 @@ async def test_failure_sets_status_failed(session, kb_and_source):
     await ingest_service.ingest_source(session, src.id, llm=BoomLLM(), storage=storage)
     await session.flush()
     refreshed = await source_repo.get_by_id(session, src.id)
-    assert refreshed.status == "failed" and "llm down" in (refreshed.error or "")
+    assert refreshed.status == "failed"
+    # #7: 不把异常原文（可能含 SQL/存储路径/密钥）透传给用户，只存稳定脱敏码
+    assert refreshed.error and "llm down" not in refreshed.error
 
 
 async def test_failure_after_flush_still_sets_failed(session, kb_and_source, monkeypatch):

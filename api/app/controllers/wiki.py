@@ -54,7 +54,9 @@ async def get_page(
             src_ids.append(uuid.UUID(str(s)))
         except (ValueError, TypeError):
             pass
-    sources = await source_repo.list_by_ids(session, src_ids)
+    # 仅返回可见 KB 的来源——晋升等路径可能让页的 source_ids 指向跨作用域的 Source，
+    # 与 backlinks/outlinks 的可见性过滤保持一致，避免泄漏他人作用域的源文件名。
+    sources = [s for s in await source_repo.list_by_ids(session, src_ids) if s.kb_id in accessible]
 
     return PageDetailOut(
         id=page.id,

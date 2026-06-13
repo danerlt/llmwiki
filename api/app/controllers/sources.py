@@ -18,6 +18,21 @@ router = APIRouter(tags=["sources"])
 _ALLOWED_EXTS = (".md", ".txt", ".pdf")
 
 
+async def _enqueue_or_fail(session: AsyncSession, source_id: uuid.UUID) -> None:
+    """入队成功则回写 job_id；失败（如 Redis 不可用）则把源置 failed 并返回 503——
+    避免源在‘先提交 pending 再入队’模式下因入队异常永久卡在 pending（系统无后台清扫器）。"""
+    try:
+        job_id = await enqueue_ingest(str(source_id))
+    except Exception:  # noqa: BLE001 — 任何入队故障都不能让源静默卡死
+        await source_repo.set_status(session, source_id, "failed", error="enqueue_failed")
+        await session.commit()
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail="任务队列暂不可用，请稍后重试"
+        )
+    await source_repo.set_job_id(session, source_id, job_id)
+    await session.commit()
+
+
 def get_storage() -> StorageBackend:
     return MinioStorage(
         endpoint=settings.minio_endpoint,
@@ -73,11 +88,8 @@ async def upload_source(
     )
     # 先持久化 source（worker 出队时必可见），再入队，消除“提交前入队”竞态
     await session.commit()
-
-    job_id = await enqueue_ingest(str(src.id))
-    await source_repo.set_job_id(session, src.id, job_id)
-    await session.commit()
-    return SourceCreatedOut(source_id=src.id, status=src.status)
+    await _enqueue_or_fail(session, src.id)
+    return SourceCreatedOut(source_id=src.id, status="pending")
 
 
 @router.get("/kbs/{kb_id}/sources", response_model=list[SourceOut])
@@ -127,8 +139,5 @@ async def reingest_source(
         detail={"kb_id": str(src.kb_id), "filename": src.filename},
     )
     await session.commit()
-
-    job_id = await enqueue_ingest(str(source_id))
-    await source_repo.set_job_id(session, source_id, job_id)
-    await session.commit()
+    await _enqueue_or_fail(session, source_id)
     return src

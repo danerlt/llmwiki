@@ -1,3 +1,4 @@
+import logging
 import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -6,6 +7,19 @@ from app.ingest import parser, pipeline
 from app.integrations.storage import StorageBackend
 from app.repositories import source_repo, wiki_repo
 from app.services import kb_service
+
+_logger = logging.getLogger("app.ingest")
+
+
+def _failure_code(exc: Exception) -> str:
+    """脱敏错误码：只暴露稳定类别/类名，绝不把可能含 SQL/存储路径/密钥的 str(exc)
+    返回给用户（该字段经 SourceOut 透传给任何对该 KB 有读权限者）。完整异常进服务端日志。"""
+    mod = (type(exc).__module__ or "").split(".")[0]
+    if mod == "httpx":
+        return "llm_unavailable"
+    if mod == "minio":
+        return "storage_unavailable"
+    return type(exc).__name__
 
 
 async def ingest_source(
@@ -85,4 +99,5 @@ async def ingest_source(
         # 先回滚清掉失败/半成品事务（否则后续 SELECT 触发 PendingRollbackError、半成品页被提交），
         # 再写 failed 终态；提交统一由调用方(worker tasks.py)负责
         await session.rollback()
-        await source_repo.set_status(session, source_id, "failed", error=str(exc))
+        _logger.exception("摄入失败 source_id=%s", source_id)  # 完整异常仅进服务端日志
+        await source_repo.set_status(session, source_id, "failed", error=_failure_code(exc))
