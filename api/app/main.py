@@ -18,12 +18,14 @@ from app.controllers import (
     wiki,
 )
 from app.core.config import settings
+from app.core.logging import configure_logging
 from app.core.middleware import RequestContextMiddleware
 
 _error_logger = logging.getLogger("app.error")
 
 
 def create_app() -> FastAPI:
+    configure_logging()
     app = FastAPI(title="LLM Wiki API")
     # CORS 先加（内层），RequestContext 后加（外层）：request_id 最先设置、最后给响应补头
     app.add_middleware(

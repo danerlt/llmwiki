@@ -33,6 +33,17 @@ async def test_incoming_request_id_is_propagated():
 
 
 @pytest.mark.asyncio
+async def test_access_log_emitted_with_method_and_path(caplog):
+    import logging
+
+    transport = ASGITransport(app=app)
+    with caplog.at_level(logging.INFO, logger="app.access"):
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            await ac.get("/api/health")
+    assert any("GET" in r.message and "/api/health" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
 async def test_readyz_ok_when_all_deps_up(monkeypatch):
     monkeypatch.setattr(health_ctrl, "_check_db", lambda: _true())
     monkeypatch.setattr(health_ctrl, "_check_redis", lambda: _true())
