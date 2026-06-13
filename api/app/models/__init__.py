@@ -1,3 +1,4 @@
+from app.models.audit_event import AuditEvent
 from app.models.department import Department
 from app.models.knowledge_base import KnowledgeBase
 from app.models.page_link import PageLink
@@ -8,6 +9,7 @@ from app.models.user import User
 from app.models.wiki_page import WikiPage
 
 __all__ = [
+    "AuditEvent",
     "Department",
     "KnowledgeBase",
     "PageLink",
