@@ -76,3 +76,19 @@ async def test_retrieve_caps_result_and_prioritizes_seed(session):
     pages = await retrieval_service.retrieve(session, admin, "关键词")
     assert len(pages) <= 8  # 共享源不再把全部 20 页拉入，总量受 cap 约束
     assert any(p.title == "关键词页" for p in pages)  # 关键词种子被优先保留
+
+
+async def test_retrieve_handles_natural_language_question(session):
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="a@x.com", password="pw123456", display_name="A", role="admin"
+    )
+    await session.flush()
+    await wiki_repo.upsert(session, kb_id=kb.id, slug="后端服务", title="后端服务",
+                           page_type="concept", content_md="使用 Python 与 FastAPI 构建",
+                           frontmatter={}, source_ids=[])
+    await session.flush()
+    # 整句以前按子串召不回；现在按词(python / 后端)召回
+    pages = await retrieval_service.retrieve(session, admin, "Python后端有哪些")
+    assert any(p.slug == "后端服务" for p in pages)
