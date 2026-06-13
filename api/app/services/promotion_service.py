@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import PromotionRequest, User
-from app.repositories import kb_repo, promotion_repo, wiki_repo
+from app.repositories import kb_repo, promotion_repo, user_repo, wiki_repo
 from app.services import kb_service, permission_service
 
 
@@ -15,7 +15,8 @@ async def request_promotion(
     to_kb_id: uuid.UUID,
     note: str | None = None,
 ) -> PromotionRequest:
-    """发起晋升申请。铁律：申请人必须能读到该源页（否则不能晋升看不到的内容）。"""
+    """发起晋升申请。铁律：申请人必须能读到源页，且必须能访问目标 KB——
+    不能把内容投送进自己都看不到的平级/无关作用域（跨作用域泄漏/投毒）。"""
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
         raise LookupError("page not found")
@@ -24,6 +25,8 @@ async def request_promotion(
         raise PermissionError("cannot promote a page you cannot read")
     if await kb_repo.get_by_id(session, to_kb_id) is None:
         raise LookupError("target kb not found")
+    if to_kb_id not in accessible:
+        raise PermissionError("cannot promote into a knowledge base you cannot access")
     return await promotion_repo.create(
         session, page_id=page_id, to_kb_id=to_kb_id, requested_by=requester.id, note=note
     )
@@ -54,6 +57,14 @@ async def approve(session: AsyncSession, reviewer: User, pr_id: uuid.UUID) -> Pr
     page = await wiki_repo.get_by_id(session, pr.page_id)
     if page is None:
         raise LookupError("source page gone")
+    # 纵深防御：按【申请人】当前可见域复核晋升合法性，挡住绕过 request_promotion
+    # 造出的、或作用域漂移后变得跨作用域的脏请求——审批者写权限不足以授权跨域复制。
+    requester = await user_repo.get_by_id(session, pr.requested_by)
+    requester_scope = (
+        await permission_service.accessible_kb_ids(session, requester) if requester else set()
+    )
+    if page.kb_id not in requester_scope or pr.to_kb_id not in requester_scope:
+        raise PermissionError("promotion violates requester scope invariant")
     await wiki_repo.upsert(
         session,
         kb_id=pr.to_kb_id,

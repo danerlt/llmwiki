@@ -31,3 +31,18 @@ def test_prod_accepts_strong_secrets():
 def test_dev_keeps_defaults_usable():
     s = Settings(_env_file=None)  # 默认 app_env=dev，弱默认不报错（本地/测试可用）
     assert s.jwt_secret == "change-me-in-prod"
+
+
+@pytest.mark.parametrize("env", ["staging", "production", "prd", "", "PROD"])
+def test_nondev_env_rejects_weak_secrets(env):
+    # 只有显式 dev/test/local 才放行弱默认；其它一切环境值（含 prod 拼写变体）都拒绝
+    with pytest.raises(ValidationError):
+        Settings(_env_file=None, app_env=env)
+
+
+def test_dev_weak_secret_warns(caplog):
+    import logging
+
+    with caplog.at_level(logging.WARNING, logger="app.config"):
+        Settings(_env_file=None)
+    assert any("弱默认凭据" in r.message for r in caplog.records)

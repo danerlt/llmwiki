@@ -1,5 +1,11 @@
+import logging
+
 from pydantic import model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+_logger = logging.getLogger("app.config")
+# 仅这些显式环境允许使用弱默认凭据；其它一切值（含 prod/staging/拼写错误/漏设）按生产严格处理
+_DEV_ENVS = {"dev", "test", "local"}
 
 
 class Settings(BaseSettings):
@@ -26,25 +32,35 @@ class Settings(BaseSettings):
     llm_model: str = ""
 
     app_url: str = "http://localhost"
-    app_env: str = "dev"  # 设为 prod 时强制拒绝弱默认凭据
+    app_env: str = "dev"  # 仅 dev/test/local 允许弱默认凭据，其它环境强制拒绝
 
     @model_validator(mode="after")
-    def _enforce_prod_secrets(self) -> "Settings":
-        """生产环境(APP_ENV=prod)下，弱默认凭据快速失败而非静默回退。"""
-        if self.app_env == "prod":
-            weak: list[str] = []
-            if (
-                not self.jwt_secret
-                or self.jwt_secret == "change-me-in-prod"
-                or len(self.jwt_secret) < 32
-            ):
-                weak.append("JWT_SECRET")
-            if self.minio_access_key == "minioadmin" or self.minio_secret_key == "minioadmin":
-                weak.append("MINIO_ACCESS_KEY/SECRET_KEY")
-            if weak:
+    def _enforce_secret_strength(self) -> "Settings":
+        """弱默认凭据：非 dev/test/local 环境一律拒绝启动；dev 类环境放行但显式告警。
+
+        安全前提不系于一个默认关闭的开关——除显式白名单外的任何 APP_ENV 值
+        （prod、staging、漏设导致的异常值、拼写错误）都按生产严格处理。
+        """
+        weak: list[str] = []
+        if (
+            not self.jwt_secret
+            or self.jwt_secret == "change-me-in-prod"
+            or len(self.jwt_secret) < 32
+        ):
+            weak.append("JWT_SECRET")
+        if self.minio_access_key == "minioadmin" or self.minio_secret_key == "minioadmin":
+            weak.append("MINIO_ACCESS_KEY/SECRET_KEY")
+        if weak:
+            if self.app_env not in _DEV_ENVS:
                 raise ValueError(
-                    f"APP_ENV=prod 下检测到弱默认凭据，拒绝启动：{', '.join(weak)}（请注入强随机值）"
+                    f"APP_ENV={self.app_env!r} 下检测到弱默认凭据，拒绝启动："
+                    f"{', '.join(weak)}（仅 dev/test/local 允许弱默认，请注入强随机值）"
                 )
+            _logger.warning(
+                "正在使用弱默认凭据 %s（APP_ENV=%s）。真实部署务必注入强随机值并设置 APP_ENV=prod。",
+                ", ".join(weak),
+                self.app_env,
+            )
         return self
 
 
