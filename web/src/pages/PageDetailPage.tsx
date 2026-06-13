@@ -1,5 +1,14 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowRight, ArrowUpRight, ChevronRight, FileText, Files, Link2 } from "lucide-react";
+import {
+  ArrowRight,
+  ArrowUpRight,
+  ChevronRight,
+  FileText,
+  Files,
+  History,
+  Link2,
+  Pencil,
+} from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { ApiError, apiFetch, postJson } from "../api/client";
@@ -106,6 +115,16 @@ export default function PageDetailPage() {
       <div className="mb-6 flex items-center gap-3">
         <h1 className="font-display text-3xl font-semibold tracking-tight">{page.title}</h1>
         <Badge>{PT[page.page_type] ?? page.page_type}</Badge>
+        {page.page_type !== "index" && (
+          <div className="ml-auto flex items-center gap-2">
+            <Link to={`/pages/${page.id}/edit`} className="btn-ghost">
+              <Pencil className="h-4 w-4" /> 编辑
+            </Link>
+            <Link to={`/pages/${page.id}/history`} className="btn-ghost">
+              <History className="h-4 w-4" /> 历史
+            </Link>
+          </div>
+        )}
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">

@@ -39,3 +39,15 @@ export async function postJson<T = unknown>(path: string, body: unknown): Promis
     body: JSON.stringify(body),
   });
 }
+
+export async function putJson<T = unknown>(path: string, body: unknown): Promise<T> {
+  return apiFetch<T>(path, {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function del<T = unknown>(path: string): Promise<T> {
+  return apiFetch<T>(path, { method: "DELETE" });
+}

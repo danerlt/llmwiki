@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ChevronRight, FileText, Loader2, RotateCcw, Upload } from "lucide-react";
+import { ChevronRight, FileText, Loader2, Plus, RotateCcw, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { apiFetch, getToken, postJson, setToken } from "../api/client";
@@ -151,6 +151,9 @@ export default function KbPagesPage() {
             {sources && sources.length > 0 && ` · ${sources.length} 个源文件`}
           </p>
         </div>
+        <Link to={`/kbs/${kbId}/pages/new`} className="btn-primary shrink-0">
+          <Plus className="h-4 w-4" /> 新建页
+        </Link>
       </div>
 
       <form onSubmit={upload} className="card mb-5 flex flex-wrap items-center gap-3 p-4">

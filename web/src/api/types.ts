@@ -60,6 +60,14 @@ export interface SourceOut {
   error: string | null;
   job_id: string | null;
 }
+export interface PageVersion {
+  version_no: number;
+  title: string;
+  page_type: string;
+  content_md: string;
+  edited_by: string | null;
+  created_at: string;
+}
 export interface Citation {
   index: number;
   page_id: string;
