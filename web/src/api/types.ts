@@ -11,6 +11,15 @@ export interface KB {
   scope_ref_id: string | null;
   name: string;
 }
+export interface Department {
+  id: string;
+  name: string;
+  parent_id: string | null;
+}
+export interface Team {
+  id: string;
+  name: string;
+}
 export interface PageOut {
   id: string;
   kb_id: string;

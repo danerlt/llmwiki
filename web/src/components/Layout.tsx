@@ -16,6 +16,11 @@ export default function Layout() {
         <Link to="/query" className="text-slate-600 hover:text-slate-900">
           问答
         </Link>
+        {user?.role === "admin" && (
+          <Link to="/admin" className="text-slate-600 hover:text-slate-900">
+            管理
+          </Link>
+        )}
         <div className="ml-auto flex items-center gap-3 text-sm">
           <span className="text-slate-500">
             {user?.display_name}（{user?.role}）
