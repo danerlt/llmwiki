@@ -42,7 +42,7 @@ COMPANY_PAGES = [
         ),
     },
     {
-        "slug": "FastAPI", "title": "FastAPI", "type": "entity",
+        "slug": "fastapi", "title": "FastAPI", "type": "entity",
         "md": (
             "FastAPI 是本平台后端的核心 Web 框架，基于 Starlette 与 Pydantic，原生支持异步。\n\n"
             "## 为什么选它\n"
@@ -58,7 +58,7 @@ COMPANY_PAGES = [
         ),
     },
     {
-        "slug": "PostgreSQL", "title": "PostgreSQL", "type": "entity",
+        "slug": "postgresql", "title": "PostgreSQL", "type": "entity",
         "md": (
             "PostgreSQL 是本平台的主数据库，存储用户、组织、知识库、wiki 页与链接图等全部元数据。\n\n"
             "## 关键词检索\n"
@@ -73,7 +73,7 @@ COMPANY_PAGES = [
         ),
     },
     {
-        "slug": "React", "title": "React", "type": "entity",
+        "slug": "react", "title": "React", "type": "entity",
         "md": (
             "React 是本平台前端框架，搭配 Vite 构建、TypeScript 类型、Tailwind 设计系统。\n\n"
             "## 技术栈\n"
