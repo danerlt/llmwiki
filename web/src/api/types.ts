@@ -10,6 +10,13 @@ export interface KB {
   scope_type: string;
   scope_ref_id: string | null;
   name: string;
+  page_count?: number;
+}
+export interface Stats {
+  kb_count: number;
+  page_count: number;
+  source_count: number;
+  pending_reviews: number;
 }
 export interface Department {
   id: string;
@@ -27,10 +34,17 @@ export interface PageOut {
   slug: string;
   page_type: string;
 }
+export interface SourceRef {
+  id: string;
+  filename: string;
+}
 export interface PageDetail extends PageOut {
   content_md: string;
   frontmatter: Record<string, unknown>;
   source_ids: string[];
+  updated_at?: string | null;
+  backlinks?: PageOut[];
+  sources?: SourceRef[];
 }
 export interface SourceOut {
   id: string;

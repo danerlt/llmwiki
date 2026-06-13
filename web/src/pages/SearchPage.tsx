@@ -48,6 +48,9 @@ export default function SearchPage() {
           {loading ? "搜索中…" : "搜索"}
         </button>
       </form>
+      {searched && hits.length > 0 && (
+        <p className="mb-3 text-sm text-ink-muted">找到 {hits.length} 个结果</p>
+      )}
       {hits.length > 0 && (
         <ul className="card divide-y divide-line overflow-hidden">
           {hits.map((p) => (

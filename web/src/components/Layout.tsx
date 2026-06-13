@@ -1,6 +1,14 @@
 import type { ReactNode } from "react";
 
-import { Inbox, Library, LogOut, ScrollText, Search, Sparkles, Users } from "lucide-react";
+import {
+  Inbox,
+  LayoutDashboard,
+  LogOut,
+  ScrollText,
+  Search,
+  Sparkles,
+  Users,
+} from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { useAuth } from "../auth/AuthContext";
@@ -47,7 +55,7 @@ export default function Layout() {
         </button>
 
         <nav className="flex flex-1 flex-col gap-1">
-          <NavItem to="/" icon={<Library className="h-[18px] w-[18px]" />} label="知识库" />
+          <NavItem to="/" icon={<LayoutDashboard className="h-[18px] w-[18px]" />} label="概览" />
           <NavItem to="/search" icon={<Search className="h-[18px] w-[18px]" />} label="搜索" />
           <NavItem to="/query" icon={<Sparkles className="h-[18px] w-[18px]" />} label="智能问答" />
           <NavItem to="/reviews" icon={<Inbox className="h-[18px] w-[18px]" />} label="审核队列" />

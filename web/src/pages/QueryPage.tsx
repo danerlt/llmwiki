@@ -6,27 +6,32 @@ import { postJson } from "../api/client";
 import type { AnswerOut } from "../api/types";
 import { PageHeader, Spinner } from "../components/ui";
 
+const EXAMPLES = ["后端用什么技术栈", "FastAPI 是什么", "知识检索怎么做的"];
+
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [ans, setAns] = useState<AnswerOut | null>(null);
   const [loading, setLoading] = useState(false);
 
-  async function onAsk(e: FormEvent) {
-    e.preventDefault();
-    if (!question.trim()) return;
+  async function ask(qText: string) {
+    if (!qText.trim()) return;
     setLoading(true);
     setAns(null);
     try {
-      setAns(await postJson<AnswerOut>("/query", { question }));
+      setAns(await postJson<AnswerOut>("/query", { question: qText }));
     } finally {
       setLoading(false);
     }
+  }
+  function onAsk(e: FormEvent) {
+    e.preventDefault();
+    void ask(question);
   }
 
   return (
     <div>
       <PageHeader title="智能问答" subtitle="基于你可见知识库的内容作答，并给出引用来源" />
-      <form onSubmit={onAsk} className="card mb-6 flex items-center gap-2 p-2 pl-4 shadow-lift">
+      <form onSubmit={onAsk} className="card mb-4 flex items-center gap-2 p-2 pl-4 shadow-lift">
         <Sparkles className="h-5 w-5 shrink-0 text-accent" />
         <input
           className="flex-1 bg-transparent py-2.5 text-base outline-none placeholder:text-ink-faint"
@@ -39,6 +44,24 @@ export default function QueryPage() {
           {loading ? "思考中…" : "提问"}
         </button>
       </form>
+      {!ans && !loading && (
+        <div className="mb-6 flex flex-wrap items-center gap-2">
+          <span className="text-xs text-ink-faint">试试：</span>
+          {EXAMPLES.map((q) => (
+            <button
+              key={q}
+              type="button"
+              onClick={() => {
+                setQuestion(q);
+                void ask(q);
+              }}
+              className="chip transition hover:border-accent/40 hover:text-accent-dark"
+            >
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
       {loading && <Spinner label="正在检索并生成回答…" />}
       {ans && (
         <div className="animate-fade space-y-5">
