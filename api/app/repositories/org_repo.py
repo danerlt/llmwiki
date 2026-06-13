@@ -25,6 +25,11 @@ async def create_team(session: AsyncSession, *, name: str) -> Team:
     return team
 
 
+async def list_teams(session: AsyncSession) -> list[Team]:
+    res = await session.execute(select(Team))
+    return list(res.scalars().all())
+
+
 async def add_team_member(session: AsyncSession, *, team_id: uuid.UUID, user_id: uuid.UUID) -> None:
     session.add(UserTeam(team_id=team_id, user_id=user_id))
 

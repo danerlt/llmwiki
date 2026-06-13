@@ -19,3 +19,18 @@ async def test_non_admin_forbidden(client, session):
     token = await _token(client, session, "user")
     r = await client.post("/api/departments", json={"name": "X"}, headers={"Authorization": f"Bearer {token}"})
     assert r.status_code == 403
+
+
+async def test_admin_lists_teams_and_users(client, session):
+    token = await _token(client, session, "admin")
+    await client.post("/api/teams", json={"name": "项目X"}, headers={"Authorization": f"Bearer {token}"})
+    r = await client.get("/api/teams", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 200 and any(t["name"] == "项目X" for t in r.json())
+    r2 = await client.get("/api/users", headers={"Authorization": f"Bearer {token}"})
+    assert r2.status_code == 200 and any(u["role"] == "admin" for u in r2.json())
+
+
+async def test_non_admin_cannot_list_users(client, session):
+    token = await _token(client, session, "user")
+    r = await client.get("/api/users", headers={"Authorization": f"Bearer {token}"})
+    assert r.status_code == 403

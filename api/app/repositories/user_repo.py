@@ -34,3 +34,8 @@ async def get_by_email(session: AsyncSession, email: str) -> User | None:
 async def get_by_id(session: AsyncSession, user_id: uuid.UUID) -> User | None:
     res = await session.execute(select(User).where(User.id == user_id))
     return res.scalar_one_or_none()
+
+
+async def list_all(session: AsyncSession) -> list[User]:
+    res = await session.execute(select(User))
+    return list(res.scalars().all())

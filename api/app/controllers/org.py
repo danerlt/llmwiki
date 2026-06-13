@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_admin
 from app.db.session import get_db
-from app.repositories import org_repo
+from app.repositories import org_repo, user_repo
 from app.schemas.auth import UserOut
 from app.schemas.org import (
     DepartmentCreate, DepartmentOut, TeamCreate, TeamMemberAdd, TeamOut, UserCreate,
@@ -32,6 +32,16 @@ async def create_team(body: TeamCreate, session: AsyncSession = Depends(get_db))
     team = await org_service.create_team(session, name=body.name)
     await session.commit()
     return team
+
+
+@router.get("/teams", response_model=list[TeamOut])
+async def list_teams(session: AsyncSession = Depends(get_db)):
+    return await org_repo.list_teams(session)
+
+
+@router.get("/users", response_model=list[UserOut])
+async def list_users(session: AsyncSession = Depends(get_db)):
+    return await user_repo.list_all(session)
 
 
 @router.post("/teams/{team_id}/members")
