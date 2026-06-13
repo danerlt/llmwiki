@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ArrowUpRight, ChevronRight, FileText, Files, Link2 } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronRight, FileText, Files, Link2 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
 import { ApiError, apiFetch, postJson } from "../api/client";
@@ -154,6 +154,20 @@ export default function PageDetailPage() {
                   <li key={b.id}>
                     <Link to={`/pages/${b.id}`} className="text-accent hover:underline">
                       {b.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </AsideCard>
+          )}
+
+          {page.outlinks && page.outlinks.length > 0 && (
+            <AsideCard icon={<ArrowRight className="h-3.5 w-3.5" />} title="本页引用">
+              <ul className="space-y-1.5 text-sm">
+                {page.outlinks.map((o) => (
+                  <li key={o.id}>
+                    <Link to={`/pages/${o.id}`} className="text-accent hover:underline">
+                      {o.title}
                     </Link>
                   </li>
                 ))}

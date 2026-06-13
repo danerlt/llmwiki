@@ -48,6 +48,7 @@ export interface PageDetail extends PageOut {
   source_ids: string[];
   updated_at?: string | null;
   backlinks?: PageOut[];
+  outlinks?: PageOut[];
   sources?: SourceRef[];
 }
 export interface SourceOut {

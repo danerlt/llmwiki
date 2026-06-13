@@ -80,6 +80,18 @@ async def upload_source(
     return SourceCreatedOut(source_id=src.id, status=src.status)
 
 
+@router.get("/kbs/{kb_id}/sources", response_model=list[SourceOut])
+async def list_sources(
+    kb_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    accessible = await permission_service.accessible_kb_ids(session, user)
+    if kb_id not in accessible:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+    return await source_repo.list_by_kb(session, kb_id)
+
+
 @router.get("/sources/{source_id}", response_model=SourceOut)
 async def get_source(
     source_id: uuid.UUID,
@@ -92,4 +104,31 @@ async def get_source(
     accessible = await permission_service.accessible_kb_ids(session, user)
     if src.kb_id not in accessible:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+    return src
+
+
+@router.post("/sources/{source_id}/reingest", response_model=SourceOut)
+async def reingest_source(
+    source_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    src = await source_repo.get_by_id(session, source_id)
+    if src is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
+    kb = await kb_repo.get_by_id(session, src.kb_id)
+    if kb is None or not await permission_service.can_write(session, user, kb):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no write permission")
+    # 复位状态再入队：失败/已完成的源都可重新摄入一遍
+    await source_repo.set_status(session, source_id, "pending", error=None)
+    await audit_service.record(
+        session, actor_id=user.id, action="source.reingest",
+        target_type="source", target_id=source_id,
+        detail={"kb_id": str(src.kb_id), "filename": src.filename},
+    )
+    await session.commit()
+
+    job_id = await enqueue_ingest(str(source_id))
+    await source_repo.set_job_id(session, source_id, job_id)
+    await session.commit()
     return src

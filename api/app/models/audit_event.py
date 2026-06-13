@@ -17,4 +17,6 @@ class AuditEvent(Base):
     target_type: Mapped[str | None] = mapped_column(String(32), nullable=True)
     target_id: Mapped[uuid.UUID | None] = mapped_column(Uuid, nullable=True)
     detail: Mapped[dict | None] = mapped_column(JSON, nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )

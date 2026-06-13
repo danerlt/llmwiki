@@ -30,6 +30,7 @@ class PageDetailOut(PageOut):
     source_ids: list[str]
     updated_at: datetime | None = None
     backlinks: list[PageOut] = []
+    outlinks: list[PageOut] = []
     sources: list[SourceRef] = []
 
 

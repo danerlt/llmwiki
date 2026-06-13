@@ -5,6 +5,7 @@ from sqlalchemy import engine_from_config, pool
 
 from app.core.config import settings
 from app.db.base import Base
+import app.models  # noqa: F401  # 触发模型注册，使 target_metadata 含全部表（autogenerate 必需）
 
 config = context.config
 sync_url = settings.database_url.replace("+asyncpg", "+psycopg2")

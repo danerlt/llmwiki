@@ -16,7 +16,7 @@ class PromotionRequest(Base):
     page_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("wiki_pages.id"))
     to_kb_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("knowledge_bases.id"))
     requested_by: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"))
-    status: Mapped[str] = mapped_column(String(16), default="pending")
+    status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
     note: Mapped[str | None] = mapped_column(Text, nullable=True)
     reviewer_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("users.id"), nullable=True

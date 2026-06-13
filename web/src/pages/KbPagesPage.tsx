@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { ChevronRight, FileText, Upload } from "lucide-react";
+import { ChevronRight, FileText, Loader2, RotateCcw, Upload } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
-import { apiFetch, getToken, setToken } from "../api/client";
+import { apiFetch, getToken, postJson, setToken } from "../api/client";
 import type { KB, PageOut, SourceOut } from "../api/types";
 import { Badge, EmptyState, Spinner } from "../components/ui";
 
@@ -14,27 +14,63 @@ const PT_LABEL: Record<string, string> = {
   source_summary: "源摘要",
   index: "目录",
 };
+const ST_LABEL: Record<string, string> = {
+  pending: "排队中",
+  processing: "摄入中",
+  done: "已完成",
+  failed: "失败",
+};
+
+function isBusy(s: SourceOut) {
+  return s.status === "pending" || s.status === "processing";
+}
 
 export default function KbPagesPage() {
   const { kbId = "" } = useParams();
   const [kbName, setKbName] = useState("");
   const [pages, setPages] = useState<PageOut[] | null>(null);
-  const [source, setSource] = useState<SourceOut | null>(null);
+  const [sources, setSources] = useState<SourceOut[] | null>(null);
   const [err, setErr] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [retrying, setRetrying] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const timerRef = useRef<number | null>(null);
+  const pollingRef = useRef(false);
   const cancelledRef = useRef(false);
 
   function loadPages() {
     apiFetch<PageOut[]>(`/kbs/${kbId}/pages`)
-      .then(setPages)
+      .then((p) => {
+        if (!cancelledRef.current) setPages(p);
+      })
       .catch(() => setErr("加载页面失败"));
+  }
+
+  // 拉取源文件清单；若有源仍在摄入中则继续轮询，全部落定后刷新页面列表
+  function loadSources() {
+    apiFetch<SourceOut[]>(`/kbs/${kbId}/sources`)
+      .then((list) => {
+        if (cancelledRef.current) return;
+        setSources(list);
+        if (timerRef.current) {
+          clearTimeout(timerRef.current);
+          timerRef.current = null;
+        }
+        if (list.some(isBusy)) {
+          pollingRef.current = true;
+          timerRef.current = window.setTimeout(loadSources, 1800);
+        } else if (pollingRef.current) {
+          pollingRef.current = false;
+          loadPages();
+        }
+      })
+      .catch(() => {});
   }
 
   useEffect(() => {
     cancelledRef.current = false;
     loadPages();
+    loadSources();
     apiFetch<KB[]>("/kbs")
       .then((ks) => setKbName(ks.find((k) => k.id === kbId)?.name ?? "知识库"))
       .catch(() => {});
@@ -44,26 +80,6 @@ export default function KbPagesPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [kbId]);
-
-  function pollStatus(sourceId: string) {
-    if (timerRef.current) clearTimeout(timerRef.current);
-    const tick = async () => {
-      try {
-        const s = await apiFetch<SourceOut>(`/sources/${sourceId}`);
-        if (cancelledRef.current) return;
-        setSource(s);
-        if (s.status === "pending" || s.status === "processing") {
-          timerRef.current = window.setTimeout(tick, 1500);
-        } else {
-          setUploading(false);
-          loadPages();
-        }
-      } catch {
-        setUploading(false);
-      }
-    };
-    void tick();
-  }
 
   async function upload(e: FormEvent) {
     e.preventDefault();
@@ -86,14 +102,26 @@ export default function KbPagesPage() {
       }
       if (!res.ok) {
         setErr(`上传失败：${await res.text()}`);
-        setUploading(false);
         return;
       }
-      const created = (await res.json()) as { source_id: string };
-      pollStatus(created.source_id);
+      if (fileRef.current) fileRef.current.value = "";
+      loadSources();
     } catch {
       setErr("网络异常，请重试");
+    } finally {
       setUploading(false);
+    }
+  }
+
+  async function reingest(id: string) {
+    setRetrying(id);
+    try {
+      await postJson(`/sources/${id}/reingest`, {});
+      loadSources();
+    } catch {
+      setErr("重新摄入失败");
+    } finally {
+      setRetrying(null);
     }
   }
 
@@ -116,34 +144,66 @@ export default function KbPagesPage() {
           <h1 className="font-display text-3xl font-semibold tracking-tight">{kbName || "知识库"}</h1>
           <p className="mt-1.5 text-sm text-ink-muted">
             共 {(pages ?? []).filter((p) => p.page_type !== "index").length} 个页面
+            {sources && sources.length > 0 && ` · ${sources.length} 个源文件`}
           </p>
         </div>
       </div>
 
-      <form onSubmit={upload} className="card mb-7 flex flex-wrap items-center gap-3 p-4">
+      <form onSubmit={upload} className="card mb-5 flex flex-wrap items-center gap-3 p-4">
         <label className="btn-ghost cursor-pointer">
           <Upload className="h-4 w-4" /> 选择文件
-          <input
-            ref={fileRef}
-            type="file"
-            accept=".md,.txt,.pdf"
-            className="hidden"
-            onChange={() => setSource(null)}
-          />
+          <input ref={fileRef} type="file" accept=".md,.txt,.pdf" className="hidden" />
         </label>
         <button className="btn-primary" disabled={uploading}>
-          {uploading ? "摄入中…" : "上传并摄入"}
+          {uploading ? "上传中…" : "上传并摄入"}
         </button>
         <span className="text-xs text-ink-faint">支持 .md / .txt / .pdf，LLM 自动编译成 wiki 页</span>
-        {source && (
-          <span className="ml-auto flex items-center gap-2 text-sm">
-            <span className="text-ink-muted">{source.filename}</span>
-            <Badge tone={source.status}>{source.status}</Badge>
-            {source.error && <span className="text-xs text-red-500">{source.error}</span>}
-          </span>
-        )}
       </form>
       {err && <p className="mb-3 text-red-600">{err}</p>}
+
+      {sources && sources.length > 0 && (
+        <section className="mb-7">
+          <h2 className="mb-2.5 flex items-center gap-2 text-sm font-semibold uppercase tracking-wider text-ink-faint">
+            源文件
+            <span className="rounded-full bg-paper px-2 py-0.5 text-xs font-normal text-ink-muted">
+              {sources.length}
+            </span>
+          </h2>
+          <div className="card divide-y divide-line/70 overflow-hidden p-0">
+            {sources.map((s) => (
+              <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
+                <span className="flex-1 truncate text-ink">{s.filename}</span>
+                {s.error && (
+                  <span className="hidden max-w-[16rem] truncate text-xs text-red-500 sm:inline" title={s.error}>
+                    {s.error}
+                  </span>
+                )}
+                {isBusy(s) ? (
+                  <span className="flex items-center gap-1.5 text-xs text-ink-muted">
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                    {ST_LABEL[s.status] ?? s.status}
+                  </span>
+                ) : (
+                  <Badge tone={s.status}>{ST_LABEL[s.status] ?? s.status}</Badge>
+                )}
+                {!isBusy(s) && (
+                  <button
+                    type="button"
+                    onClick={() => reingest(s.id)}
+                    disabled={retrying === s.id}
+                    className="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-xs text-ink-muted transition hover:bg-paper hover:text-accent-dark disabled:opacity-50"
+                    title="重新摄入"
+                  >
+                    <RotateCcw className={`h-3.5 w-3.5 ${retrying === s.id ? "animate-spin" : ""}`} />
+                    重新摄入
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {!pages ? (
         <Spinner />

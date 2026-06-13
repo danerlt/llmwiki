@@ -29,6 +29,7 @@ const TONES: Record<string, string> = {
   personal: "border-line bg-paper text-ink-muted",
   approved: "border-accent/30 bg-accent-soft text-accent-dark",
   pending: "border-amber-300/50 bg-amber-50 text-amber-700",
+  processing: "border-sky-300/50 bg-sky-50 text-sky-700",
   rejected: "border-red-200 bg-red-50 text-red-600",
   failed: "border-red-200 bg-red-50 text-red-600",
   done: "border-accent/30 bg-accent-soft text-accent-dark",

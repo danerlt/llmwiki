@@ -48,3 +48,22 @@ async def test_replace_links_and_backfill(session):
     await session.flush()
     links = await wiki_repo.links_from(session, a.id)
     assert links[0].to_page_id == b.id  # 回填命中
+
+
+async def test_outlinks_returns_only_resolved_targets(session):
+    kb = await _kb(session)
+    a = await wiki_repo.upsert(
+        session, kb_id=kb.id, slug="A", title="A",
+        page_type="entity", content_md="见 [[B]] 与 [[缺失]]", frontmatter={}, source_ids=[],
+    )
+    b = await wiki_repo.upsert(
+        session, kb_id=kb.id, slug="B", title="B",
+        page_type="concept", content_md="x", frontmatter={}, source_ids=[],
+    )
+    await session.flush()
+    await wiki_repo.replace_links(session, from_page_id=a.id, to_slugs=["B", "缺失"])
+    await session.flush()
+    await wiki_repo.backfill_link_targets(session, kb_id=kb.id)
+    await session.flush()
+    outs = await wiki_repo.outlinks(session, a.id)
+    assert [o.id for o in outs] == [b.id]  # 只含已解析目标，未解析的「缺失」不出现

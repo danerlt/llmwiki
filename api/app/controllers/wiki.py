@@ -47,6 +47,7 @@ async def get_page(
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
 
     backlinks = [b for b in await wiki_repo.backlinks(session, page_id) if b.kb_id in accessible]
+    outlinks = [o for o in await wiki_repo.outlinks(session, page_id) if o.kb_id in accessible]
     src_ids: list[uuid.UUID] = []
     for s in page.source_ids or []:
         try:
@@ -68,6 +69,10 @@ async def get_page(
         backlinks=[
             PageOut(id=b.id, kb_id=b.kb_id, title=b.title, slug=b.slug, page_type=b.page_type)
             for b in backlinks
+        ],
+        outlinks=[
+            PageOut(id=o.id, kb_id=o.kb_id, title=o.title, slug=o.slug, page_type=o.page_type)
+            for o in outlinks
         ],
         sources=[SourceRef(id=s.id, filename=s.filename) for s in sources],
     )

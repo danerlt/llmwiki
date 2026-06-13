@@ -68,6 +68,67 @@ async def test_upload_forbidden_without_write(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_list_sources_returns_kb_sources(session, client):
+    user, kb = await _setup_user_kb(session)
+    await source_repo.create(
+        session, kb_id=kb.id, uploader_id=user.id, filename="a.md",
+        content_type="text/markdown", storage_key="k",
+    )
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.get(f"/api/kbs/{kb.id}/sources")
+        assert r.status_code == 200
+        items = r.json()
+        assert len(items) == 1 and items[0]["filename"] == "a.md"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_reingest_resets_status_and_enqueues(session, client):
+    user, kb = await _setup_user_kb(session)
+    src = await source_repo.create(
+        session, kb_id=kb.id, uploader_id=user.id, filename="a.md",
+        content_type="text/markdown", storage_key="k", status="failed",
+    )
+    await source_repo.set_status(session, src.id, "failed", error="boom")
+    await session.commit()
+
+    enqueued: list[str] = []
+
+    async def _fake_enqueue(source_id: str) -> str:
+        enqueued.append(source_id)
+        return "job-re"
+
+    sources_ctrl.enqueue_ingest = _fake_enqueue
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.post(f"/api/sources/{src.id}/reingest")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["status"] == "pending" and body["error"] is None
+        assert enqueued == [str(src.id)]
+        refreshed = await source_repo.get_by_id(session, src.id)
+        assert refreshed.status == "pending" and refreshed.job_id == "job-re"
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_reingest_forbidden_without_write(session, client):
+    user, kb = await _setup_user_kb(session, role="user")
+    src = await source_repo.create(
+        session, kb_id=kb.id, uploader_id=user.id, filename="a.md",
+        content_type="text/markdown", storage_key="k",
+    )
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.post(f"/api/sources/{src.id}/reingest")
+        assert r.status_code == 403
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_upload_rejects_empty_file(session, client):
     user, kb = await _setup_user_kb(session)
     await session.commit()

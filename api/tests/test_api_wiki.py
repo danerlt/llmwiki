@@ -39,3 +39,28 @@ async def test_get_page_detail_accessible(session, client):
         assert r.json()["source_ids"] == ["s1"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_get_page_includes_outlinks(session, client):
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="admin@x.com", password="pw123456", display_name="Admin", role="admin"
+    )
+    a = await wiki_repo.upsert(session, kb_id=kb.id, slug="a", title="A",
+                               page_type="entity", content_md="见 [[b]]", frontmatter={}, source_ids=[])
+    b = await wiki_repo.upsert(session, kb_id=kb.id, slug="b", title="B",
+                              page_type="concept", content_md="x", frontmatter={}, source_ids=[])
+    await session.flush()
+    await wiki_repo.replace_links(session, from_page_id=a.id, to_slugs=["b"])
+    await session.flush()
+    await wiki_repo.backfill_link_targets(session, kb_id=kb.id)
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        r = await client.get(f"/api/pages/{a.id}")
+        assert r.status_code == 200
+        outs = r.json()["outlinks"]
+        assert [o["slug"] for o in outs] == ["b"]  # 本页出链含已解析的 b
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)

@@ -146,6 +146,16 @@ async def backlinks(session: AsyncSession, page_id: uuid.UUID) -> list[WikiPage]
     return list(res.scalars().unique().all())
 
 
+async def outlinks(session: AsyncSession, page_id: uuid.UUID) -> list[WikiPage]:
+    """出链：本页通过 [[wikilink]] 指向、且已解析到既有页的目标页。"""
+    res = await session.execute(
+        select(WikiPage)
+        .join(PageLink, PageLink.to_page_id == WikiPage.id)
+        .where(PageLink.from_page_id == page_id, PageLink.to_page_id.is_not(None))
+    )
+    return list(res.scalars().unique().all())
+
+
 async def recent(
     session: AsyncSession, kb_ids: list[uuid.UUID], limit: int = 8
 ) -> list[WikiPage]:
