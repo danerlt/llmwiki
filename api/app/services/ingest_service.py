@@ -5,25 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ingest import parser, pipeline
 from app.integrations.storage import StorageBackend
 from app.repositories import source_repo, wiki_repo
-
-
-def _index_markdown(pages) -> str:
-    """按 page_type 分组列出非 index 页，生成目录 markdown。"""
-    groups: dict[str, list] = {}
-    for p in pages:
-        if p.page_type == "index":
-            continue
-        groups.setdefault(p.page_type, []).append(p)
-    lines = ["# 目录（index）", ""]
-    for ptype in ("overview", "entity", "concept", "source_summary"):
-        items = groups.get(ptype)
-        if not items:
-            continue
-        lines.append(f"## {ptype}")
-        for p in sorted(items, key=lambda x: x.title):
-            lines.append(f"- [[{p.slug}]] {p.title}")
-        lines.append("")
-    return "\n".join(lines)
+from app.services import kb_service
 
 
 async def ingest_source(
@@ -92,18 +74,8 @@ async def ingest_source(
             )
 
         await session.flush()
-        # 重建 index 目录页
-        pages = await wiki_repo.list_by_kb(session, src.kb_id)
-        await wiki_repo.upsert(
-            session,
-            kb_id=src.kb_id,
-            slug="index",
-            title="目录",
-            page_type="index",
-            content_md=_index_markdown(pages),
-            frontmatter={"type": "index"},
-            source_ids=[],
-        )
+        # 重建 index 目录页（复用 kb_service.rebuild_index，与晋升共用）
+        await kb_service.rebuild_index(session, src.kb_id)
         await session.flush()
         # 回填 wikilink 目标
         await wiki_repo.backfill_link_targets(session, kb_id=src.kb_id)
