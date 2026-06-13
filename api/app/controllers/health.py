@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Response, status
 from sqlalchemy import text
 
+from app.core import metrics
 from app.core.config import settings
 from app.db.session import SessionLocal
 
@@ -11,6 +12,12 @@ router = APIRouter(tags=["health"])
 async def health() -> dict[str, str]:
     """存活探针（liveness）：进程在跑即 ok。"""
     return {"status": "ok"}
+
+
+@router.get("/metrics")
+async def metrics_endpoint() -> Response:
+    """Prometheus 抓取端点（进程内聚合的请求量与延迟）。"""
+    return Response(content=metrics.render(), media_type="text/plain; version=0.0.4; charset=utf-8")
 
 
 async def _check_db() -> bool:

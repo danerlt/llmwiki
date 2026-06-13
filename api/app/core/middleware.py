@@ -13,6 +13,8 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from starlette.responses import Response
 
+from app.core import metrics
+
 # 当前请求的 id，供日志格式化与全局异常处理读取（无请求上下文时为 "-"）
 request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
@@ -40,6 +42,7 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         _access_logger.info(
             "%s %s -> %s %.1fms", request.method, request.url.path, response.status_code, dur_ms
         )
+        metrics.observe(request.method, response.status_code, dur_ms / 1000)
         response.headers["X-Request-ID"] = rid
         for key, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)

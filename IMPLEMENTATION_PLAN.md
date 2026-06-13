@@ -39,10 +39,10 @@
 ### 阶段 2：平台基线与可运维性 🚧
 **目标**：补齐企业采购“必查项”的 Web/运维基线，作为后续一切特性的地基。
 - 🚧 安全/运维中间件：✅安全响应头 ✅CORS ✅request_id 贯穿 / ⬜限流(rate limit) ⬜TrustedHost
-- ✅ 全局异常处理（统一错误体，不泄漏堆栈/SQL，带 request_id）/ ⬜ 结构化日志（接 request_id）
+- ✅ 全局异常处理（统一错误体，不泄漏堆栈/SQL，带 request_id）✅ 结构化日志 + 请求访问日志（method/path/status/dur + request_id）
 - ✅ 深度健康检查：`/health`(存活) + `/readyz`(探 DB/Redis/MinIO 就绪，任一不通 503)
-- ⬜ Prometheus `/metrics`（请求量/延迟/错误率 + 队列积压 + LLM 调用计量）
-- ⬜ 列表接口统一分页（游标/offset）：audit / recent / pages / sources
+- ✅ Prometheus `/metrics`（进程内请求量 + 延迟聚合）/ ⬜ 队列积压 + LLM 调用计量
+- 🚧 列表接口统一分页：✅审计(envelope+总数+动作过滤+加载更多) / ⬜ pages/sources（受 KB 体量约束，暂留）
 - ⬜ LLM 网关健壮化：超时分级 + 重试退避 + 熔断 + token 计量（在阶段 1 瞬时重试基础上扩展）
 
 ### 阶段 3：内容创作与版本（Confluence/Notion 对标，最大产品缺口）🚧

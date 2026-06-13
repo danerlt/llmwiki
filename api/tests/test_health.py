@@ -44,6 +44,17 @@ async def test_access_log_emitted_with_method_and_path(caplog):
 
 
 @pytest.mark.asyncio
+async def test_metrics_exposes_request_counters():
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as ac:
+        await ac.get("/api/health")
+        resp = await ac.get("/api/metrics")
+    assert resp.status_code == 200
+    assert "http_requests_total" in resp.text
+    assert "http_request_duration_seconds_count" in resp.text
+
+
+@pytest.mark.asyncio
 async def test_readyz_ok_when_all_deps_up(monkeypatch):
     monkeypatch.setattr(health_ctrl, "_check_db", lambda: _true())
     monkeypatch.setattr(health_ctrl, "_check_redis", lambda: _true())
