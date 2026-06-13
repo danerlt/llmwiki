@@ -28,6 +28,23 @@ def _is_transient(exc: Exception) -> bool:
     return (type(exc).__module__ or "").split(".")[0] in {"httpx", "minio"}
 
 
+async def _prune_orphans(
+    session: AsyncSession, kb_id: uuid.UUID, sid: str, keep_slugs: set[str]
+) -> None:
+    """清理本 source 上一轮产出、本次未再生成的孤儿页（保证 reingest 幂等）。
+
+    页可由多个 source 派生：仅摘除本 sid；若摘除后再无其它来源支撑，则删除该孤儿页。
+    """
+    for p in await wiki_repo.list_by_kb(session, kb_id):
+        if sid not in (p.source_ids or []) or p.slug in keep_slugs:
+            continue
+        remaining = [s for s in p.source_ids if s != sid]
+        if remaining:
+            p.source_ids = remaining  # 仍有其它来源，保留页、仅去除本溯源
+        else:
+            await wiki_repo.delete_page(session, p.id)
+
+
 async def ingest_source(
     session: AsyncSession,
     source_id: uuid.UUID,
@@ -99,6 +116,8 @@ async def ingest_source(
                 session, from_page_id=page.id, to_slugs=pipeline.extract_wikilinks(d.content_md)
             )
 
+        # 清理本 source 上一轮产出、本次未再生成的孤儿页（reingest 幂等；seen_slugs 即本次全部 slug）
+        await _prune_orphans(session, src.kb_id, sid, seen_slugs)
         await session.flush()
         # 重建 index 目录页（复用 kb_service.rebuild_index，与晋升共用）
         await kb_service.rebuild_index(session, src.kb_id)

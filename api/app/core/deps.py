@@ -25,6 +25,9 @@ async def get_current_user(
     user = await user_repo.get_by_id(session, uuid.UUID(user_id))
     if user is None:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="user not found")
+    # 会话版本校验：登出/封禁/改密后自增 token_version，使旧令牌(tv 不匹配)立即失效
+    if payload.get("tv", 0) != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="token revoked")
     return user
 
 

@@ -88,6 +88,29 @@ async def test_idempotent_rerun(session, kb_and_source):
     assert n1 == n2  # 重跑不产生重复页
 
 
+async def test_reingest_prunes_orphan_pages(session, kb_and_source):
+    """reingest 时 LLM 产出不同 slug，旧页应被清理而非残留为孤儿。"""
+    kb, src, storage = kb_and_source
+    await ingest_service.ingest_source(
+        session, src.id,
+        llm=_llm({"entities": ["A"]}, [{"title": "旧", "slug": "old", "page_type": "entity", "content_md": "x"}]),
+        storage=storage,
+    )
+    await session.flush()
+    assert "old" in {p.slug for p in await wiki_repo.list_by_kb(session, kb.id)}
+
+    # 重新摄入：产出不同 slug "new"
+    await ingest_service.ingest_source(
+        session, src.id,
+        llm=_llm({"entities": ["B"]}, [{"title": "新", "slug": "new", "page_type": "entity", "content_md": "y"}]),
+        storage=storage,
+    )
+    await session.flush()
+    slugs = {p.slug for p in await wiki_repo.list_by_kb(session, kb.id)}
+    assert "new" in slugs
+    assert "old" not in slugs  # 孤儿页被清理，不残留错误溯源
+
+
 async def test_failure_sets_status_failed(session, kb_and_source):
     kb, src, storage = kb_and_source
 

@@ -18,7 +18,7 @@ class Settings(BaseSettings):
     max_upload_bytes: int = 50 * 1024 * 1024  # 单文件上限，与 nginx client_max_body_size 对齐
 
     jwt_secret: str = "change-me-in-prod"
-    jwt_expire_min: int = 720
+    jwt_expire_min: int = 480  # 8h，缩短被盗令牌的有效窗口（配合 token_version 吊销）
 
     minio_endpoint: str = "minio:9000"
     minio_access_key: str = "minioadmin"

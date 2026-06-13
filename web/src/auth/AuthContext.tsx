@@ -7,7 +7,7 @@ interface AuthState {
   user: UserOut | null;
   loading: boolean;
   login: (token: string) => Promise<void>;
-  logout: () => void;
+  logout: () => Promise<void>;
 }
 
 const Ctx = createContext<AuthState | null>(null);
@@ -40,7 +40,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setLoading(true);
     await loadMe();
   }
-  function logout() {
+  async function logout() {
+    // 服务端吊销当前会话（自增 token_version），失败也继续清本地，保证总能登出
+    try {
+      await apiFetch("/auth/logout", { method: "POST" });
+    } catch {
+      /* best-effort */
+    }
     setToken(null);
     setUser(null);
   }

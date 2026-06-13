@@ -75,6 +75,16 @@ async def backfill_link_targets(session: AsyncSession, *, kb_id: uuid.UUID) -> N
         link.to_page_id = slug_to_id.get(link.to_slug)
 
 
+async def delete_page(session: AsyncSession, page_id: uuid.UUID) -> None:
+    """删除页及其相关链接（出链与入链），用于 reingest 清理孤儿页。"""
+    await session.execute(
+        delete(PageLink).where(
+            or_(PageLink.from_page_id == page_id, PageLink.to_page_id == page_id)
+        )
+    )
+    await session.execute(delete(WikiPage).where(WikiPage.id == page_id))
+
+
 async def search_pages(
     session: AsyncSession, kb_ids: list[uuid.UUID], q: str, limit: int = 20
 ) -> list[WikiPage]:
