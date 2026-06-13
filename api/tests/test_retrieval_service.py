@@ -56,3 +56,23 @@ async def test_graph_expansion_pulls_linked_pages(session):
     pages = await retrieval_service.retrieve(session, admin, "关键词X")
     slugs = {p.slug for p in pages}
     assert "种子" in slugs and "相关" in slugs   # 图扩展拉入直接链接页（虽不含关键词）
+
+
+async def test_retrieve_caps_result_and_prioritizes_seed(session):
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="admin@x.com", password="pw123456", display_name="A", role="admin"
+    )
+    await session.flush()
+    for i in range(20):  # 20 个共享同一 source 的页，仅一个标题含关键词
+        await wiki_repo.upsert(
+            session, kb_id=kb.id, slug=f"p{i}",
+            title="关键词页" if i == 0 else f"页{i}",
+            page_type="concept", content_md="关键词" if i == 0 else "其它",
+            frontmatter={}, source_ids=["s1"],
+        )
+    await session.flush()
+    pages = await retrieval_service.retrieve(session, admin, "关键词")
+    assert len(pages) <= 8  # 共享源不再把全部 20 页拉入，总量受 cap 约束
+    assert any(p.title == "关键词页" for p in pages)  # 关键词种子被优先保留
