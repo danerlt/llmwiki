@@ -81,9 +81,11 @@ async def search_pages(
     """可移植关键词召回：标题/正文子串匹配（lower+LIKE），排除 index，标题命中排前。"""
     if not kb_ids or not q:
         return []
-    pattern = f"%{q.lower()}%"
-    title_match = func.lower(WikiPage.title).like(pattern)
-    body_match = func.lower(WikiPage.content_md).like(pattern)
+    # 转义 LIKE 元字符（先转义反斜杠本身），使含 % _ 的关键词按字面子串匹配
+    escaped = q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+    pattern = f"%{escaped}%"
+    title_match = func.lower(WikiPage.title).like(pattern, escape="\\")
+    body_match = func.lower(WikiPage.content_md).like(pattern, escape="\\")
     stmt = (
         select(WikiPage)
         .where(

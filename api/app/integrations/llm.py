@@ -24,4 +24,11 @@ class LLMClient:
                 },
             )
             resp.raise_for_status()
-            return resp.json()["choices"][0]["message"]["content"]
+            data = resp.json()
+            try:
+                content = data["choices"][0]["message"]["content"]
+            except (KeyError, IndexError, TypeError):
+                content = None
+            if not isinstance(content, str):
+                raise ValueError(f"LLM 返回结构异常: {str(data)[:200]}")
+            return content

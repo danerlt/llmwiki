@@ -60,6 +60,16 @@ async def ingest_source(
                 )
             )
 
+        # 同批 slug 去重：碰撞者追加序号后缀，避免本批内静默互相覆盖（跨 source 重跑仍走 upsert 幂等）
+        seen_slugs: set[str] = set()
+        for d in drafts:
+            base = d.slug
+            n = 2
+            while d.slug in seen_slugs:
+                d.slug = f"{base}-{n}"
+                n += 1
+            seen_slugs.add(d.slug)
+
         sid = str(src.id)
         for d in drafts:
             existing = await wiki_repo.get_by_slug(session, src.kb_id, d.slug)
@@ -100,4 +110,7 @@ async def ingest_source(
 
         await source_repo.set_status(session, source_id, "done")
     except Exception as exc:  # noqa: BLE001 — 摄入失败要落库可观测
+        # 先回滚清掉失败/半成品事务（否则后续 SELECT 触发 PendingRollbackError、半成品页被提交），
+        # 再写 failed 终态；提交统一由调用方(worker tasks.py)负责
+        await session.rollback()
         await source_repo.set_status(session, source_id, "failed", error=str(exc))

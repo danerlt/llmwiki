@@ -26,7 +26,13 @@ def _parse_pdf(data: bytes) -> str:
 
 
 def slugify(text: str) -> str:
-    """生成 slug：去首尾空白，ASCII 转小写，非字母数字（CJK 等 \\w 字符保留）转连字符。"""
+    """生成 slug：去首尾空白，ASCII 转小写，非字母数字（CJK 等 \\w 字符保留）转连字符。
+    若归一化后为空（纯标点/符号标题），按原文 hash 兜底，保证非空且不同原文不撞同一 slug。"""
+    raw = text
     text = text.strip().lower()
-    text = re.sub(r"[^\w]+", "-", text)
-    return text.strip("-")
+    text = re.sub(r"[^\w]+", "-", text).strip("-")
+    if not text:
+        import hashlib
+
+        text = "page-" + hashlib.sha1(raw.strip().encode("utf-8")).hexdigest()[:8]
+    return text

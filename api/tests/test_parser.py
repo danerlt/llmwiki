@@ -44,3 +44,11 @@ def test_slugify():
     assert slugify("Hello World") == "hello-world"
     assert slugify("技术部") == "技术部"  # 中文保留
     assert slugify("  A / B  ") == "a-b"
+
+
+def test_slugify_empty_falls_back_to_distinct_nonempty():
+    a = slugify("###")
+    b = slugify("+++")
+    assert a and b  # 非空兜底
+    assert a != b  # 不同原文不撞同一 slug
+    assert a.startswith("page-")

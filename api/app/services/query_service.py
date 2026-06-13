@@ -26,5 +26,8 @@ async def answer(
         citations.append({"page_id": p.id, "title": p.title, "kb_id": p.kb_id})
 
     user_prompt = f"问题：{question}\n\n资料：\n" + "\n\n".join(parts)
-    answer_text = await llm.complete(QUERY_SYSTEM, user_prompt)
+    try:
+        answer_text = await llm.complete(QUERY_SYSTEM, user_prompt)
+    except Exception:  # noqa: BLE001 — LLM 不可用时降级返回，仍带可见 KB 的引用，不裸 500
+        return {"answer": "（问答服务暂不可用，请稍后重试）", "citations": citations}
     return {"answer": answer_text, "citations": citations}

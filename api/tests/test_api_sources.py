@@ -66,3 +66,19 @@ async def test_upload_forbidden_without_write(session, client):
     finally:
         app.dependency_overrides.pop(sources_ctrl.get_storage, None)
         app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_upload_rejects_empty_file(session, client):
+    user, kb = await _setup_user_kb(session)
+    await session.commit()
+    app.dependency_overrides[sources_ctrl.get_storage] = lambda: FakeStorage()
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.post(
+            f"/api/kbs/{kb.id}/sources",
+            files={"file": ("a.md", b"", "text/markdown")},
+        )
+        assert r.status_code == 400
+    finally:
+        app.dependency_overrides.pop(sources_ctrl.get_storage, None)
+        app.dependency_overrides.pop(get_current_user, None)

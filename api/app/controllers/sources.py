@@ -15,6 +15,8 @@ from app.worker.queue import enqueue_ingest
 
 router = APIRouter(tags=["sources"])
 
+_ALLOWED_EXTS = (".md", ".txt", ".pdf")
+
 
 def get_storage() -> StorageBackend:
     return MinioStorage(
@@ -40,12 +42,23 @@ async def upload_source(
     if not await permission_service.can_write(session, user, kb):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no write permission")
 
+    filename = file.filename or "upload.bin"
+    if not any(filename.lower().endswith(ext) for ext in _ALLOWED_EXTS):
+        raise HTTPException(
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="仅支持 .md/.txt/.pdf"
+        )
     data = await file.read()
+    if not data:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="empty file")
+    if len(data) > settings.max_upload_bytes:
+        raise HTTPException(
+            status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="file too large"
+        )
     src = await source_repo.create(
         session,
         kb_id=kb_id,
         uploader_id=user.id,
-        filename=file.filename or "upload.bin",
+        filename=filename,
         content_type=file.content_type or "application/octet-stream",
         storage_key="",  # 落库拿到 id 后再定 key
     )
@@ -53,6 +66,8 @@ async def upload_source(
     storage_key = f"{kb_id}/{src.id}/{src.filename}"
     storage.put(storage_key, data, src.content_type)
     src.storage_key = storage_key
+    # 先持久化 source（worker 出队时必可见），再入队，消除“提交前入队”竞态
+    await session.commit()
 
     job_id = await enqueue_ingest(str(src.id))
     await source_repo.set_job_id(session, src.id, job_id)

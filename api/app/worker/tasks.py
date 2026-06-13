@@ -19,7 +19,11 @@ async def ingest_source(ctx: dict, source_id: str) -> None:
         secure=settings.minio_secure,
     )
     async with SessionLocal() as session:
-        await ingest_service.ingest_source(
-            session, uuid.UUID(source_id), llm=llm, storage=storage
-        )
-        await session.commit()
+        try:
+            await ingest_service.ingest_source(
+                session, uuid.UUID(source_id), llm=llm, storage=storage
+            )
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise

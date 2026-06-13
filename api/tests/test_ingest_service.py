@@ -26,7 +26,7 @@ async def kb_and_source(session):
         session, kb_id=kb.id, uploader_id=u.id, filename="a.md",
         content_type="text/markdown", storage_key="k1",
     )
-    await session.flush()
+    await session.commit()  # 模拟真实流程：source 由上传端点先提交，ingest 失败 rollback 不应误伤
     return kb, src, storage
 
 
@@ -98,3 +98,41 @@ async def test_failure_sets_status_failed(session, kb_and_source):
     await session.flush()
     refreshed = await source_repo.get_by_id(session, src.id)
     assert refreshed.status == "failed" and "llm down" in (refreshed.error or "")
+
+
+async def test_failure_after_flush_still_sets_failed(session, kb_and_source, monkeypatch):
+    """页已 flush 之后才失败时，except 先 rollback（清掉污染事务，否则后续写会因 PendingRollbackError 崩），
+    仍能把 failed 落库。M8“不残留半成品页”由 rollback-first 构造保证（rollback 丢弃所有未提交页）。"""
+    kb, src, storage = kb_and_source
+
+    async def _boom(session, *, kb_id):
+        raise RuntimeError("backfill boom")
+
+    monkeypatch.setattr(wiki_repo, "backfill_link_targets", _boom)
+    llm = _llm(
+        {"entities": ["X"]},
+        [{"title": "X", "slug": "x", "page_type": "entity", "content_md": "x"}],
+    )
+
+    await ingest_service.ingest_source(session, src.id, llm=llm, storage=storage)  # 不应抛异常
+
+    refreshed = await source_repo.get_by_id(session, src.id)
+    assert refreshed.status == "failed"
+
+
+async def test_same_batch_slug_collision_kept_separate(session, kb_and_source):
+    """同批 C++ / C# 经 slugify 都得 'c'，应去重为两页而非互相覆盖。"""
+    kb, src, storage = kb_and_source
+    llm = _llm(
+        {"entities": ["C++", "C#"]},
+        [
+            {"title": "C++", "slug": "C++", "page_type": "entity", "content_md": "cpp"},
+            {"title": "C#", "slug": "C#", "page_type": "entity", "content_md": "csharp"},
+        ],
+    )
+    await ingest_service.ingest_source(session, src.id, llm=llm, storage=storage)
+    await session.flush()
+    contents = {
+        p.content_md for p in await wiki_repo.list_by_kb(session, kb.id) if p.page_type == "entity"
+    }
+    assert "cpp" in contents and "csharp" in contents

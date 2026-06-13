@@ -50,3 +50,15 @@ async def test_list_by_kbs(session):
     await session.flush()
     pages = await wiki_repo.list_by_kbs(session, [kb1.id, kb2.id])
     assert {p.slug for p in pages} == {"p1", "p2"}
+
+
+async def test_search_escapes_like_wildcards(session):
+    kb = await _kb(session)
+    await wiki_repo.upsert(session, kb_id=kb.id, slug="p1", title="user_id 字段",
+                           page_type="entity", content_md="说明 user_id", frontmatter={}, source_ids=[])
+    await wiki_repo.upsert(session, kb_id=kb.id, slug="p2", title="userxid",
+                           page_type="entity", content_md="userxid", frontmatter={}, source_ids=[])
+    await session.flush()
+    titles = {p.title for p in await wiki_repo.search_pages(session, [kb.id], "user_id", limit=10)}
+    assert "user_id 字段" in titles  # 字面命中
+    assert "userxid" not in titles  # _ 不再当通配符匹配任意字符
