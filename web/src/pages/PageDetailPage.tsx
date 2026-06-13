@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
-import { ArrowLeft, ArrowUpRight, FileText, Link2 } from "lucide-react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useEffect, useState, type ReactNode } from "react";
+import { ArrowUpRight, ChevronRight, FileText, Files, Link2 } from "lucide-react";
+import { Link, useParams } from "react-router-dom";
 
 import { ApiError, apiFetch, postJson } from "../api/client";
 import type { KB, PageDetail, PageOut } from "../api/types";
@@ -16,11 +16,24 @@ const PT: Record<string, string> = {
   source_summary: "源摘要",
 };
 
+function AsideCard({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <div className="card p-4">
+      <h3 className="mb-2.5 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">
+        {icon}
+        {title}
+      </h3>
+      {children}
+    </div>
+  );
+}
+
 export default function PageDetailPage() {
   const { pageId = "" } = useParams();
-  const navigate = useNavigate();
   const [page, setPage] = useState<PageDetail | null>(null);
   const [slugMap, setSlugMap] = useState<Record<string, string>>({});
+  const [siblings, setSiblings] = useState<PageOut[]>([]);
+  const [kbName, setKbName] = useState("");
   const [err, setErr] = useState("");
   const [kbs, setKbs] = useState<KB[]>([]);
   const [target, setTarget] = useState("");
@@ -35,8 +48,10 @@ export default function PageDetailPage() {
       .then(async (p) => {
         if (cancelled) return;
         setPage(p);
-        const siblings = await apiFetch<PageOut[]>(`/kbs/${p.kb_id}/pages`);
-        if (!cancelled) setSlugMap(Object.fromEntries(siblings.map((s) => [s.slug, s.id])));
+        const sibs = await apiFetch<PageOut[]>(`/kbs/${p.kb_id}/pages`);
+        if (cancelled) return;
+        setSiblings(sibs);
+        setSlugMap(Object.fromEntries(sibs.map((s) => [s.slug, s.id])));
       })
       .catch((e) => {
         if (cancelled) return;
@@ -46,13 +61,18 @@ export default function PageDetailPage() {
       });
     apiFetch<KB[]>("/kbs")
       .then((ks) => {
-        if (!cancelled) setKbs(ks);
+        if (cancelled) return;
+        setKbs(ks);
       })
       .catch(() => {});
     return () => {
       cancelled = true;
     };
   }, [pageId]);
+
+  useEffect(() => {
+    if (page) setKbName(kbs.find((k) => k.id === page.kb_id)?.name ?? "知识库");
+  }, [page, kbs]);
 
   async function promote() {
     if (!target) return;
@@ -68,14 +88,21 @@ export default function PageDetailPage() {
   if (err) return <p className="text-red-600">{err}</p>;
   if (!page) return <Spinner />;
 
+  const related = siblings.filter((s) => s.id !== page.id && s.page_type !== "index").slice(0, 6);
+
   return (
     <article>
-      <button
-        onClick={() => navigate(-1)}
-        className="mb-5 inline-flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-ink"
-      >
-        <ArrowLeft className="h-4 w-4" /> 返回
-      </button>
+      <nav className="mb-3 flex items-center gap-1.5 text-sm text-ink-muted">
+        <Link to="/" className="hover:text-ink">
+          概览
+        </Link>
+        <ChevronRight className="h-3.5 w-3.5 text-ink-faint" />
+        <Link to={`/kbs/${page.kb_id}/pages`} className="hover:text-ink">
+          {kbName}
+        </Link>
+        <ChevronRight className="h-3.5 w-3.5 text-ink-faint" />
+        <span className="truncate text-ink">{page.title}</span>
+      </nav>
       <div className="mb-6 flex items-center gap-3">
         <h1 className="font-display text-3xl font-semibold tracking-tight">{page.title}</h1>
         <Badge>{PT[page.page_type] ?? page.page_type}</Badge>
@@ -87,8 +114,7 @@ export default function PageDetailPage() {
         </div>
 
         <aside className="space-y-4">
-          <div className="card p-4">
-            <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-ink-faint">信息</h3>
+          <AsideCard icon={null} title="信息">
             <dl className="space-y-2.5 text-sm">
               <div className="flex items-center justify-between">
                 <dt className="text-ink-muted">类型</dt>
@@ -104,16 +130,13 @@ export default function PageDetailPage() {
               )}
               <div className="flex items-center justify-between">
                 <dt className="text-ink-muted">slug</dt>
-                <dd className="font-mono text-xs text-ink-faint">{page.slug}</dd>
+                <dd className="truncate font-mono text-xs text-ink-faint">{page.slug}</dd>
               </div>
             </dl>
-          </div>
+          </AsideCard>
 
           {page.sources && page.sources.length > 0 && (
-            <div className="card p-4">
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">
-                <FileText className="h-3.5 w-3.5" /> 来源
-              </h3>
+            <AsideCard icon={<FileText className="h-3.5 w-3.5" />} title="来源">
               <ul className="space-y-1 text-sm text-ink">
                 {page.sources.map((s) => (
                   <li key={s.id} className="truncate">
@@ -121,14 +144,11 @@ export default function PageDetailPage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </AsideCard>
           )}
 
           {page.backlinks && page.backlinks.length > 0 && (
-            <div className="card p-4">
-              <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">
-                <Link2 className="h-3.5 w-3.5" /> 被引用
-              </h3>
+            <AsideCard icon={<Link2 className="h-3.5 w-3.5" />} title="被引用">
               <ul className="space-y-1.5 text-sm">
                 {page.backlinks.map((b) => (
                   <li key={b.id}>
@@ -138,19 +158,26 @@ export default function PageDetailPage() {
                   </li>
                 ))}
               </ul>
-            </div>
+            </AsideCard>
           )}
 
-          <div className="card p-4">
-            <h3 className="mb-2 flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-ink-faint">
-              <ArrowUpRight className="h-3.5 w-3.5" /> 申请晋升
-            </h3>
+          {related.length > 0 && (
+            <AsideCard icon={<Files className="h-3.5 w-3.5" />} title="相关页">
+              <ul className="space-y-1.5 text-sm">
+                {related.map((r) => (
+                  <li key={r.id}>
+                    <Link to={`/pages/${r.id}`} className="text-ink hover:text-accent-dark">
+                      {r.title}
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </AsideCard>
+          )}
+
+          <AsideCard icon={<ArrowUpRight className="h-3.5 w-3.5" />} title="申请晋升">
             <div className="space-y-2">
-              <select
-                className="field"
-                value={target}
-                onChange={(e) => setTarget(e.target.value)}
-              >
+              <select className="field" value={target} onChange={(e) => setTarget(e.target.value)}>
                 <option value="">选择目标知识库</option>
                 {kbs
                   .filter((k) => k.id !== page.kb_id)
@@ -165,7 +192,7 @@ export default function PageDetailPage() {
               </button>
               {promoteMsg && <p className="text-xs text-accent-dark">{promoteMsg}</p>}
             </div>
-          </div>
+          </AsideCard>
         </aside>
       </div>
     </article>

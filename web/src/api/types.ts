@@ -56,6 +56,7 @@ export interface SourceOut {
   job_id: string | null;
 }
 export interface Citation {
+  index: number;
   page_id: string;
   title: string;
   kb_id: string;

@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 
 import { postJson } from "../api/client";
 import type { AnswerOut } from "../api/types";
+import Markdown from "../components/Markdown";
 import { PageHeader, Spinner } from "../components/ui";
 
 const EXAMPLES = ["后端用什么技术栈", "FastAPI 是什么", "知识检索怎么做的"];
@@ -69,7 +70,7 @@ export default function QueryPage() {
             <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-accent">
               <Sparkles className="h-3.5 w-3.5" /> 回答
             </div>
-            <p className="whitespace-pre-wrap leading-relaxed text-ink">{ans.answer}</p>
+            <Markdown content={ans.answer} />
           </div>
           {ans.citations.length > 0 && (
             <div>
@@ -77,13 +78,13 @@ export default function QueryPage() {
                 <Quote className="h-4 w-4" /> 引用来源
               </h2>
               <div className="flex flex-wrap gap-2">
-                {ans.citations.map((c, i) => (
+                {ans.citations.map((c) => (
                   <Link
                     key={c.page_id}
                     to={`/pages/${c.page_id}`}
                     className="chip transition hover:border-accent/40 hover:text-accent-dark"
                   >
-                    <span className="font-mono text-accent">[{i + 1}]</span> {c.title}
+                    <span className="font-mono text-accent">[{c.index}]</span> {c.title}
                   </Link>
                 ))}
               </div>
