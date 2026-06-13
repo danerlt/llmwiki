@@ -1,3 +1,55 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+  body {
+    @apply bg-paper text-ink font-sans;
+    background-image:
+      radial-gradient(55rem 55rem at 112% -12%, rgba(21, 121, 95, 0.07), transparent 60%),
+      radial-gradient(48rem 48rem at -12% 112%, rgba(180, 120, 60, 0.05), transparent 60%);
+    background-attachment: fixed;
+  }
+  ::selection {
+    background: rgba(21, 121, 95, 0.16);
+  }
+  ::-webkit-scrollbar {
+    width: 11px;
+    height: 11px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #d8d2c6;
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background: #c4bdae;
+    background-clip: padding-box;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-medium transition-all active:scale-[.98] disabled:cursor-not-allowed disabled:opacity-50;
+  }
+  .btn-primary {
+    @apply btn bg-accent text-white shadow-soft hover:bg-accent-dark;
+  }
+  .btn-ghost {
+    @apply btn border border-line bg-card text-ink hover:border-ink/20 hover:bg-paper;
+  }
+  .field {
+    @apply w-full rounded-xl border border-line bg-card px-3.5 py-2.5 text-sm text-ink outline-none transition placeholder:text-ink-faint focus:border-accent focus:ring-4 focus:ring-accent/10;
+  }
+  .card {
+    @apply rounded-2xl border border-line bg-card shadow-soft;
+  }
+  .chip {
+    @apply inline-flex items-center gap-1 rounded-full border border-line bg-paper px-2.5 py-0.5 text-xs font-medium text-ink-muted;
+  }
+}

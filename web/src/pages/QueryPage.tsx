@@ -1,8 +1,10 @@
 import { useState, type FormEvent } from "react";
+import { Quote, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { postJson } from "../api/client";
 import type { AnswerOut } from "../api/types";
+import { PageHeader, Spinner } from "../components/ui";
 
 export default function QueryPage() {
   const [question, setQuestion] = useState("");
@@ -11,6 +13,7 @@ export default function QueryPage() {
 
   async function onAsk(e: FormEvent) {
     e.preventDefault();
+    if (!question.trim()) return;
     setLoading(true);
     setAns(null);
     try {
@@ -22,37 +25,45 @@ export default function QueryPage() {
 
   return (
     <div>
-      <h1 className="mb-4 text-2xl font-semibold">问答</h1>
-      <form onSubmit={onAsk} className="mb-4 flex gap-2">
+      <PageHeader title="智能问答" subtitle="基于你可见知识库的内容作答，并给出引用来源" />
+      <form onSubmit={onAsk} className="card mb-6 flex items-center gap-2 p-2 pl-4 shadow-lift">
+        <Sparkles className="h-5 w-5 shrink-0 text-accent" />
         <input
-          className="flex-1 rounded border px-3 py-2"
+          className="flex-1 bg-transparent py-2.5 text-base outline-none placeholder:text-ink-faint"
           value={question}
           onChange={(e) => setQuestion(e.target.value)}
-          placeholder="提问（MVP 关键词召回，建议用关键词）"
+          placeholder="提个问题，例如「后端用什么技术栈」"
+          autoFocus
         />
-        <button
-          className="rounded bg-slate-800 px-4 text-white hover:bg-slate-700"
-          disabled={loading}
-        >
+        <button className="btn-primary" disabled={loading}>
           {loading ? "思考中…" : "提问"}
         </button>
       </form>
+      {loading && <Spinner label="正在检索并生成回答…" />}
       {ans && (
-        <div className="space-y-4">
-          <div className="whitespace-pre-wrap rounded border bg-white p-4">{ans.answer}</div>
+        <div className="animate-fade space-y-5">
+          <div className="card p-6">
+            <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-accent">
+              <Sparkles className="h-3.5 w-3.5" /> 回答
+            </div>
+            <p className="whitespace-pre-wrap leading-relaxed text-ink">{ans.answer}</p>
+          </div>
           {ans.citations.length > 0 && (
             <div>
-              <h2 className="mb-1 text-sm font-semibold text-slate-600">引用</h2>
-              <ul className="space-y-1 text-sm">
+              <h2 className="mb-2 flex items-center gap-1.5 text-sm font-medium text-ink-muted">
+                <Quote className="h-4 w-4" /> 引用来源
+              </h2>
+              <div className="flex flex-wrap gap-2">
                 {ans.citations.map((c, i) => (
-                  <li key={c.page_id}>
-                    [{i + 1}]{" "}
-                    <Link to={`/pages/${c.page_id}`} className="text-blue-600 hover:underline">
-                      {c.title}
-                    </Link>
-                  </li>
+                  <Link
+                    key={c.page_id}
+                    to={`/pages/${c.page_id}`}
+                    className="chip transition hover:border-accent/40 hover:text-accent-dark"
+                  >
+                    <span className="font-mono text-accent">[{i + 1}]</span> {c.title}
+                  </Link>
                 ))}
-              </ul>
+              </div>
             </div>
           )}
         </div>

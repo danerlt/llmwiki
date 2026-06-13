@@ -1,7 +1,23 @@
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { Building2, UserPlus, Users } from "lucide-react";
 
 import { apiFetch, postJson } from "../api/client";
 import type { Department, Team, UserOut } from "../api/types";
+import { Badge, PageHeader } from "../components/ui";
+
+function Section({ icon, title, children }: { icon: ReactNode; title: string; children: ReactNode }) {
+  return (
+    <section className="card p-6">
+      <h2 className="mb-4 flex items-center gap-2.5 font-display text-lg font-semibold tracking-tight">
+        <span className="grid h-8 w-8 place-items-center rounded-lg bg-accent-soft text-accent-dark">
+          {icon}
+        </span>
+        {title}
+      </h2>
+      {children}
+    </section>
+  );
+}
 
 export default function AdminPage() {
   const [depts, setDepts] = useState<Department[]>([]);
@@ -28,36 +44,79 @@ export default function AdminPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-2xl font-semibold">组织管理</h1>
-      {msg && <p className="text-sm text-slate-600">{msg}</p>}
+    <div>
+      <PageHeader title="组织管理" subtitle="部门、团队与用户" />
+      {msg && <p className="mb-4 text-sm text-accent-dark">{msg}</p>}
+      <div className="space-y-5">
+        <Section icon={<Building2 className="h-[18px] w-[18px]" />} title="部门">
+          <DeptList depts={depts} />
+          <DeptForm
+            depts={depts}
+            onCreate={(name, parentId) =>
+              run(() => postJson("/departments", { name, parent_id: parentId }), "部门已创建")
+            }
+          />
+        </Section>
 
-      <DeptSection
-        depts={depts}
-        onCreate={(name, parentId) =>
-          run(() => postJson("/departments", { name, parent_id: parentId }), "部门已创建")
-        }
-      />
+        <Section icon={<Users className="h-[18px] w-[18px]" />} title="团队">
+          <div className="mb-4 flex flex-wrap gap-2">
+            {teams.length === 0 && <span className="text-sm text-ink-faint">暂无团队</span>}
+            {teams.map((t) => (
+              <Badge key={t.id} tone="team">
+                {t.name}
+              </Badge>
+            ))}
+          </div>
+          <TeamForms
+            teams={teams}
+            users={users}
+            onCreate={(name) => run(() => postJson("/teams", { name }), "团队已创建")}
+            onAddMember={(teamId, userId) =>
+              run(() => postJson(`/teams/${teamId}/members`, { user_id: userId }), "成员已加入")
+            }
+          />
+        </Section>
 
-      <TeamSection
-        teams={teams}
-        users={users}
-        onCreate={(name) => run(() => postJson("/teams", { name }), "团队已创建")}
-        onAddMember={(teamId, userId) =>
-          run(() => postJson(`/teams/${teamId}/members`, { user_id: userId }), "成员已加入")
-        }
-      />
-
-      <UserSection
-        users={users}
-        depts={depts}
-        onCreate={(body) => run(() => postJson("/users", body), "用户已创建")}
-      />
+        <Section icon={<UserPlus className="h-[18px] w-[18px]" />} title="用户">
+          <ul className="mb-4 divide-y divide-line rounded-xl border border-line">
+            {users.map((u) => (
+              <li key={u.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+                <span className="grid h-7 w-7 place-items-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent-dark">
+                  {u.display_name[0]}
+                </span>
+                <span className="font-medium text-ink">{u.display_name}</span>
+                <span className="text-ink-faint">{u.email}</span>
+                <span className="ml-auto">
+                  <Badge tone={u.role === "admin" ? "company" : "personal"}>{u.role}</Badge>
+                </span>
+              </li>
+            ))}
+          </ul>
+          <UserForm
+            depts={depts}
+            onCreate={(body) => run(() => postJson("/users", body), "用户已创建")}
+          />
+        </Section>
+      </div>
     </div>
   );
 }
 
-function DeptSection({
+function DeptList({ depts }: { depts: Department[] }) {
+  if (depts.length === 0) return <p className="mb-4 text-sm text-ink-faint">暂无部门</p>;
+  return (
+    <ul className="mb-4 flex flex-wrap gap-2">
+      {depts.map((d) => (
+        <Badge key={d.id} tone="department">
+          {d.name}
+          {d.parent_id ? " · 子部门" : ""}
+        </Badge>
+      ))}
+    </ul>
+  );
+}
+
+function DeptForm({
   depts,
   onCreate,
 }: {
@@ -73,33 +132,27 @@ function DeptSection({
     setName("");
   }
   return (
-    <section className="rounded border bg-white p-4">
-      <h2 className="mb-2 font-semibold">部门</h2>
-      <ul className="mb-3 list-disc pl-5 text-sm text-slate-700">
+    <form onSubmit={submit} className="flex flex-wrap gap-2">
+      <input
+        className="field max-w-[12rem]"
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="部门名"
+      />
+      <select className="field max-w-[12rem]" value={parent} onChange={(e) => setParent(e.target.value)}>
+        <option value="">（顶级部门）</option>
         {depts.map((d) => (
-          <li key={d.id}>
+          <option key={d.id} value={d.id}>
             {d.name}
-            {d.parent_id ? "（子部门）" : ""}
-          </li>
+          </option>
         ))}
-      </ul>
-      <form onSubmit={submit} className="flex flex-wrap gap-2">
-        <input className="rounded border px-2 py-1" value={name}
-          onChange={(e) => setName(e.target.value)} placeholder="部门名" />
-        <select className="rounded border px-2 py-1" value={parent}
-          onChange={(e) => setParent(e.target.value)}>
-          <option value="">（顶级部门）</option>
-          {depts.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
-        <button className="rounded bg-slate-800 px-3 text-white">新建部门</button>
-      </form>
-    </section>
+      </select>
+      <button className="btn-primary">新建部门</button>
+    </form>
   );
 }
 
-function TeamSection({
+function TeamForms({
   teams,
   users,
   onCreate,
@@ -114,13 +167,7 @@ function TeamSection({
   const [teamId, setTeamId] = useState("");
   const [userId, setUserId] = useState("");
   return (
-    <section className="rounded border bg-white p-4">
-      <h2 className="mb-2 font-semibold">团队</h2>
-      <ul className="mb-3 list-disc pl-5 text-sm text-slate-700">
-        {teams.map((t) => (
-          <li key={t.id}>{t.name}</li>
-        ))}
-      </ul>
+    <div className="space-y-2">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -129,11 +176,15 @@ function TeamSection({
             setName("");
           }
         }}
-        className="mb-2 flex gap-2"
+        className="flex flex-wrap gap-2"
       >
-        <input className="rounded border px-2 py-1" value={name}
-          onChange={(e) => setName(e.target.value)} placeholder="团队名" />
-        <button className="rounded bg-slate-800 px-3 text-white">新建团队</button>
+        <input
+          className="field max-w-[12rem]"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="团队名"
+        />
+        <button className="btn-primary">新建团队</button>
       </form>
       <form
         onSubmit={(e) => {
@@ -142,23 +193,25 @@ function TeamSection({
         }}
         className="flex flex-wrap gap-2"
       >
-        <select className="rounded border px-2 py-1" value={teamId}
-          onChange={(e) => setTeamId(e.target.value)}>
+        <select className="field max-w-[10rem]" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
           <option value="">选团队</option>
           {teams.map((t) => (
-            <option key={t.id} value={t.id}>{t.name}</option>
+            <option key={t.id} value={t.id}>
+              {t.name}
+            </option>
           ))}
         </select>
-        <select className="rounded border px-2 py-1" value={userId}
-          onChange={(e) => setUserId(e.target.value)}>
+        <select className="field max-w-[10rem]" value={userId} onChange={(e) => setUserId(e.target.value)}>
           <option value="">选用户</option>
           {users.map((u) => (
-            <option key={u.id} value={u.id}>{u.display_name}</option>
+            <option key={u.id} value={u.id}>
+              {u.display_name}
+            </option>
           ))}
         </select>
-        <button className="rounded border px-3">加入成员</button>
+        <button className="btn-ghost">加入成员</button>
       </form>
-    </section>
+    </div>
   );
 }
 
@@ -170,12 +223,10 @@ interface NewUser {
   department_id: string | null;
 }
 
-function UserSection({
-  users,
+function UserForm({
   depts,
   onCreate,
 }: {
-  users: UserOut[];
   depts: Department[];
   onCreate: (body: NewUser) => void;
 }) {
@@ -193,36 +244,47 @@ function UserSection({
     setF({ email: "", password: "", display_name: "", role: "user", department_id: null });
   }
   return (
-    <section className="rounded border bg-white p-4">
-      <h2 className="mb-2 font-semibold">用户</h2>
-      <ul className="mb-3 list-disc pl-5 text-sm text-slate-700">
-        {users.map((u) => (
-          <li key={u.id}>
-            {u.display_name}（{u.email}，{u.role}）
-          </li>
+    <form onSubmit={submit} className="flex flex-wrap gap-2">
+      <input
+        className="field max-w-[12rem]"
+        value={f.email}
+        onChange={(e) => setF({ ...f, email: e.target.value })}
+        placeholder="邮箱"
+      />
+      <input
+        className="field max-w-[10rem]"
+        type="password"
+        value={f.password}
+        onChange={(e) => setF({ ...f, password: e.target.value })}
+        placeholder="密码"
+      />
+      <input
+        className="field max-w-[8rem]"
+        value={f.display_name}
+        onChange={(e) => setF({ ...f, display_name: e.target.value })}
+        placeholder="姓名"
+      />
+      <select
+        className="field max-w-[7rem]"
+        value={f.role}
+        onChange={(e) => setF({ ...f, role: e.target.value })}
+      >
+        <option value="user">user</option>
+        <option value="admin">admin</option>
+      </select>
+      <select
+        className="field max-w-[9rem]"
+        value={f.department_id ?? ""}
+        onChange={(e) => setF({ ...f, department_id: e.target.value || null })}
+      >
+        <option value="">（无部门）</option>
+        {depts.map((d) => (
+          <option key={d.id} value={d.id}>
+            {d.name}
+          </option>
         ))}
-      </ul>
-      <form onSubmit={submit} className="flex flex-wrap gap-2">
-        <input className="rounded border px-2 py-1" value={f.email}
-          onChange={(e) => setF({ ...f, email: e.target.value })} placeholder="邮箱" />
-        <input className="rounded border px-2 py-1" type="password" value={f.password}
-          onChange={(e) => setF({ ...f, password: e.target.value })} placeholder="密码" />
-        <input className="rounded border px-2 py-1" value={f.display_name}
-          onChange={(e) => setF({ ...f, display_name: e.target.value })} placeholder="姓名" />
-        <select className="rounded border px-2 py-1" value={f.role}
-          onChange={(e) => setF({ ...f, role: e.target.value })}>
-          <option value="user">user</option>
-          <option value="admin">admin</option>
-        </select>
-        <select className="rounded border px-2 py-1" value={f.department_id ?? ""}
-          onChange={(e) => setF({ ...f, department_id: e.target.value || null })}>
-          <option value="">（无部门）</option>
-          {depts.map((d) => (
-            <option key={d.id} value={d.id}>{d.name}</option>
-          ))}
-        </select>
-        <button className="rounded bg-slate-800 px-3 text-white">新建用户</button>
-      </form>
-    </section>
+      </select>
+      <button className="btn-primary">新建用户</button>
+    </form>
   );
 }

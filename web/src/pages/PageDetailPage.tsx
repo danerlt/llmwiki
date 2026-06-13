@@ -1,13 +1,24 @@
 import { useEffect, useState } from "react";
-import { useParams } from "react-router-dom";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
 
 import { ApiError, apiFetch, postJson } from "../api/client";
 import type { KB, PageDetail, PageOut } from "../api/types";
 import Markdown from "../components/Markdown";
+import { Badge, Spinner } from "../components/ui";
 import { resolveWikilinks } from "../lib/wikilink";
+
+const PT: Record<string, string> = {
+  index: "目录",
+  overview: "概览",
+  entity: "实体",
+  concept: "概念",
+  source_summary: "源摘要",
+};
 
 export default function PageDetailPage() {
   const { pageId = "" } = useParams();
+  const navigate = useNavigate();
   const [page, setPage] = useState<PageDetail | null>(null);
   const [slugMap, setSlugMap] = useState<Record<string, string>>({});
   const [err, setErr] = useState("");
@@ -19,6 +30,7 @@ export default function PageDetailPage() {
     let cancelled = false;
     setPage(null);
     setErr("");
+    setPromoteMsg("");
     apiFetch<PageDetail>(`/pages/${pageId}`)
       .then(async (p) => {
         if (cancelled) return;
@@ -47,47 +59,51 @@ export default function PageDetailPage() {
     setPromoteMsg("");
     try {
       await postJson(`/pages/${pageId}/promote`, { to_kb_id: target });
-      setPromoteMsg("已提交晋升申请，等待目标 KB 审核者批准");
+      setPromoteMsg("已提交晋升申请，等待目标知识库的审核者批准。");
     } catch {
       setPromoteMsg("申请失败");
     }
   }
 
-  if (err) return <div className="text-red-600">{err}</div>;
-  if (!page) return <div>加载中…</div>;
+  if (err) return <p className="text-red-600">{err}</p>;
+  if (!page) return <Spinner />;
   return (
     <article>
-      <h1 className="mb-1 text-2xl font-semibold">{page.title}</h1>
-      <p className="mb-4 text-xs text-slate-400">
-        {page.page_type} · slug: {page.slug}
-      </p>
-      <Markdown content={resolveWikilinks(page.content_md, slugMap)} />
-
-      <div className="mt-8 rounded border bg-white p-4">
-        <h2 className="mb-2 text-sm font-semibold text-slate-600">申请晋升到其它知识库</h2>
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            className="rounded border px-2 py-1"
-            value={target}
-            onChange={(e) => setTarget(e.target.value)}
-          >
-            <option value="">选择目标 KB</option>
-            {kbs
-              .filter((k) => k.id !== page.kb_id)
-              .map((k) => (
-                <option key={k.id} value={k.id}>
-                  {k.name}
-                </option>
-              ))}
-          </select>
-          <button
-            onClick={promote}
-            className="rounded bg-slate-800 px-3 py-1 text-sm text-white hover:bg-slate-700"
-          >
-            申请晋升
-          </button>
-          {promoteMsg && <span className="text-sm text-slate-600">{promoteMsg}</span>}
-        </div>
+      <button
+        onClick={() => navigate(-1)}
+        className="mb-5 inline-flex items-center gap-1.5 text-sm text-ink-muted transition hover:text-ink"
+      >
+        <ArrowLeft className="h-4 w-4" /> 返回
+      </button>
+      <div className="mb-6 flex items-center gap-3">
+        <h1 className="font-display text-3xl font-semibold tracking-tight">{page.title}</h1>
+        <Badge>{PT[page.page_type] ?? page.page_type}</Badge>
+      </div>
+      <div className="card p-7">
+        <Markdown content={resolveWikilinks(page.content_md, slugMap)} />
+      </div>
+      <div className="card mt-6 flex flex-wrap items-center gap-3 p-4">
+        <span className="flex items-center gap-2 text-sm font-medium text-ink-muted">
+          <ArrowUpRight className="h-4 w-4" /> 申请晋升到
+        </span>
+        <select
+          className="field max-w-[14rem]"
+          value={target}
+          onChange={(e) => setTarget(e.target.value)}
+        >
+          <option value="">选择目标知识库</option>
+          {kbs
+            .filter((k) => k.id !== page.kb_id)
+            .map((k) => (
+              <option key={k.id} value={k.id}>
+                {k.name}
+              </option>
+            ))}
+        </select>
+        <button onClick={promote} className="btn-ghost" disabled={!target}>
+          提交申请
+        </button>
+        {promoteMsg && <span className="text-sm text-accent-dark">{promoteMsg}</span>}
       </div>
     </article>
   );
