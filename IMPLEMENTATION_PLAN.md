@@ -45,13 +45,13 @@
 - ⬜ 列表接口统一分页（游标/offset）：audit / recent / pages / sources
 - ⬜ LLM 网关健壮化：超时分级 + 重试退避 + 熔断 + token 计量（在阶段 1 瞬时重试基础上扩展）
 
-### 阶段 3：内容创作与版本（Confluence/Notion 对标，最大产品缺口）⬜
+### 阶段 3：内容创作与版本（Confluence/Notion 对标，最大产品缺口）🚧
 **目标**：让人能直接创建/编辑/删除页与查看历史——当前页面只能由 LLM 摄入生成，这是对标产品的头号缺口。
-- ⬜ 人工页 CRUD：POST/PUT/PATCH/DELETE，受 can_write 约束；slug 唯一与 wikilink 重建
-- ⬜ 前端 Markdown 编辑器（编辑/预览/保存，复用现有渲染）
-- ⬜ 版本历史 + 修订对比(diff) + 回滚（page_versions 表，每次保存留版本）
+- ✅ 人工页 CRUD：POST/PUT/DELETE，受 can_write 约束；slug 唯一(409)、系统页类型拒绝、wikilink 重建、审计
+- ✅ 前端 Markdown 编辑器（创建/编辑/删除 + 实时预览，复用渲染）
+- ✅ 版本历史 + 回滚（page_versions 表，每次保存留版本；前端历史页查看+回滚）/ ⬜ 行级 diff 高亮
 - ⬜ 草稿 → 评审 → 发布 状态机（避免半成品污染检索/RAG）
-- ⬜ 软删除 / 回收站 / 恢复
+- ⬜ 软删除 / 回收站 / 恢复（当前为硬删除）
 
 ### 阶段 4：协作 ⬜
 **目标**：把散落 IM 的讨论沉淀回知识，构建留存命脉。
