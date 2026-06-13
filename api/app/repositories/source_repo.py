@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Source
@@ -51,3 +51,19 @@ async def set_job_id(session: AsyncSession, source_id: uuid.UUID, job_id: str) -
 async def list_by_kb(session: AsyncSession, kb_id: uuid.UUID) -> list[Source]:
     res = await session.execute(select(Source).where(Source.kb_id == kb_id))
     return list(res.scalars().all())
+
+
+async def list_by_ids(session: AsyncSession, ids: list[uuid.UUID]) -> list[Source]:
+    if not ids:
+        return []
+    res = await session.execute(select(Source).where(Source.id.in_(ids)))
+    return list(res.scalars().all())
+
+
+async def count_by_kbs(session: AsyncSession, kb_ids: list[uuid.UUID]) -> int:
+    if not kb_ids:
+        return 0
+    res = await session.execute(
+        select(func.count()).select_from(Source).where(Source.kb_id.in_(kb_ids))
+    )
+    return int(res.scalar() or 0)

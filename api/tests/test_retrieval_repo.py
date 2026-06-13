@@ -62,3 +62,23 @@ async def test_search_escapes_like_wildcards(session):
     titles = {p.title for p in await wiki_repo.search_pages(session, [kb.id], "user_id", limit=10)}
     assert "user_id 字段" in titles  # 字面命中
     assert "userxid" not in titles  # _ 不再当通配符匹配任意字符
+
+
+async def test_counts_backlinks_recent(session):
+    kb = await _kb(session)
+    a = await wiki_repo.upsert(session, kb_id=kb.id, slug="a", title="A",
+                               page_type="entity", content_md="见 [[b]]", frontmatter={}, source_ids=[])
+    b = await wiki_repo.upsert(session, kb_id=kb.id, slug="b", title="B",
+                               page_type="concept", content_md="x", frontmatter={}, source_ids=[])
+    await wiki_repo.upsert(session, kb_id=kb.id, slug="index", title="目录",
+                           page_type="index", content_md="", frontmatter={}, source_ids=[])
+    await session.flush()
+    await wiki_repo.replace_links(session, from_page_id=a.id, to_slugs=["b"])
+    await session.flush()
+    await wiki_repo.backfill_link_targets(session, kb_id=kb.id)
+    await session.flush()
+
+    assert (await wiki_repo.counts_by_kbs(session, [kb.id])).get(kb.id) == 2  # index 不计
+    assert any(p.id == a.id for p in await wiki_repo.backlinks(session, b.id))  # a → b
+    recent = await wiki_repo.recent(session, [kb.id], limit=10)
+    assert all(p.page_type != "index" for p in recent) and len(recent) == 2

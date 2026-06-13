@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import delete, func, or_, select
+from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import PageLink, WikiPage
@@ -119,4 +119,43 @@ async def list_by_kbs(session: AsyncSession, kb_ids: list[uuid.UUID]) -> list[Wi
     if not kb_ids:
         return []
     res = await session.execute(select(WikiPage).where(WikiPage.kb_id.in_(kb_ids)))
+    return list(res.scalars().all())
+
+
+async def counts_by_kbs(
+    session: AsyncSession, kb_ids: list[uuid.UUID]
+) -> dict[uuid.UUID, int]:
+    """每个 KB 的内容页数（不含 index 目录页）。"""
+    if not kb_ids:
+        return {}
+    res = await session.execute(
+        select(WikiPage.kb_id, func.count())
+        .where(WikiPage.kb_id.in_(kb_ids), WikiPage.page_type != "index")
+        .group_by(WikiPage.kb_id)
+    )
+    return {row[0]: int(row[1]) for row in res.all()}
+
+
+async def backlinks(session: AsyncSession, page_id: uuid.UUID) -> list[WikiPage]:
+    """反向链接：哪些页通过 [[wikilink]] 指向本页。"""
+    res = await session.execute(
+        select(WikiPage)
+        .join(PageLink, PageLink.from_page_id == WikiPage.id)
+        .where(PageLink.to_page_id == page_id)
+    )
+    return list(res.scalars().unique().all())
+
+
+async def recent(
+    session: AsyncSession, kb_ids: list[uuid.UUID], limit: int = 8
+) -> list[WikiPage]:
+    """跨可见 KB 的最近更新内容页（不含 index）。"""
+    if not kb_ids:
+        return []
+    res = await session.execute(
+        select(WikiPage)
+        .where(WikiPage.kb_id.in_(kb_ids), WikiPage.page_type != "index")
+        .order_by(desc(WikiPage.updated_at))
+        .limit(limit)
+    )
     return list(res.scalars().all())
