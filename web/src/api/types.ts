@@ -38,6 +38,10 @@ export interface SourceRef {
   id: string;
   filename: string;
 }
+export interface SearchHit extends PageOut {
+  snippet: string;
+  matched: string;
+}
 export interface PageDetail extends PageOut {
   content_md: string;
   frontmatter: Record<string, unknown>;

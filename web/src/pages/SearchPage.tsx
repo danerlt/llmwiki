@@ -1,9 +1,9 @@
-import { useState, type FormEvent } from "react";
+import { useState, type FormEvent, type ReactNode } from "react";
 import { FileText, Search } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
-import type { PageOut } from "../api/types";
+import type { SearchHit } from "../api/types";
 import { Badge, EmptyState, PageHeader } from "../components/ui";
 
 const PT: Record<string, string> = {
@@ -14,9 +14,23 @@ const PT: Record<string, string> = {
   source_summary: "源摘要",
 };
 
+function highlight(text: string, term: string): ReactNode {
+  if (!term) return text;
+  const esc = term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return text.split(new RegExp(`(${esc})`, "gi")).map((part, i) =>
+    part.toLowerCase() === term.toLowerCase() ? (
+      <mark key={i} className="rounded bg-accent-soft px-0.5 text-accent-dark">
+        {part}
+      </mark>
+    ) : (
+      <span key={i}>{part}</span>
+    ),
+  );
+}
+
 export default function SearchPage() {
   const [q, setQ] = useState("");
-  const [hits, setHits] = useState<PageOut[]>([]);
+  const [hits, setHits] = useState<SearchHit[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -25,7 +39,7 @@ export default function SearchPage() {
     if (!q.trim()) return;
     setLoading(true);
     try {
-      setHits(await apiFetch<PageOut[]>(`/search?q=${encodeURIComponent(q)}`));
+      setHits(await apiFetch<SearchHit[]>(`/search?q=${encodeURIComponent(q)}`));
       setSearched(true);
     } finally {
       setLoading(false);
@@ -51,22 +65,28 @@ export default function SearchPage() {
       {searched && hits.length > 0 && (
         <p className="mb-3 text-sm text-ink-muted">找到 {hits.length} 个结果</p>
       )}
-      {hits.length > 0 && (
-        <ul className="card divide-y divide-line overflow-hidden">
-          {hits.map((p) => (
-            <li key={p.id}>
-              <Link
-                to={`/pages/${p.id}`}
-                className="flex items-center gap-3 px-5 py-3.5 transition hover:bg-paper"
-              >
-                <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
-                <span className="flex-1 truncate text-ink">{p.title}</span>
-                <Badge>{PT[p.page_type] ?? p.page_type}</Badge>
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
+      <div className="space-y-3">
+        {hits.map((p) => (
+          <Link
+            key={p.id}
+            to={`/pages/${p.id}`}
+            className="card group block p-4 transition hover:-translate-y-0.5 hover:shadow-lift"
+          >
+            <div className="flex items-center gap-2.5">
+              <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
+              <span className="flex-1 truncate font-medium text-ink group-hover:text-accent-dark">
+                {p.title}
+              </span>
+              <Badge>{PT[p.page_type] ?? p.page_type}</Badge>
+            </div>
+            {p.snippet && (
+              <p className="mt-2 line-clamp-2 pl-[26px] text-sm leading-relaxed text-ink-muted">
+                {highlight(p.snippet, p.matched)}
+              </p>
+            )}
+          </Link>
+        ))}
+      </div>
       {searched && hits.length === 0 && (
         <EmptyState icon={<Search className="h-8 w-8" />} title="无匹配结果" hint="换个关键词试试。" />
       )}
