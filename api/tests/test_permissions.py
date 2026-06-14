@@ -4,7 +4,6 @@ import pytest_asyncio
 from app.repositories import kb_repo, org_repo, user_repo
 from app.services import kb_service, permission_service
 
-
 pytestmark = pytest.mark.asyncio
 
 

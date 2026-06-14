@@ -10,15 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - name: Install uv
+        uses: astral-sh/setup-uv@v6
         with:
-          python-version: "3.12"
-          cache: pip
-      - name: Install deps
-        run: pip install -r api/requirements.txt
+          enable-cache: true
+      - name: Sync deps
+        working-directory: api
+        run: uv sync --frozen
+      - name: Lint (ruff)
+        working-directory: api
+        run: uv run ruff check .
       - name: Run tests
         working-directory: api
-        run: python -m pytest -q
+        run: uv run python -m pytest -q
 
   frontend:
     runs-on: ubuntu-latest

@@ -1,4 +1,145 @@
+# ==============================================================================
+# 项目元信息
+# ==============================================================================
+[project]
+name = "llmwiki-api"
+version = "0.1.0"
+description = "企业 LLM-Wiki 后端服务（FastAPI + 异步 SQLAlchemy + PostgreSQL + arq）"
+requires-python = ">=3.12"
+
+# ------------------------------------------------------------------------------
+# 运行时依赖：按职责分组注释，便于裁剪 / 升级时定位影响范围
+# ------------------------------------------------------------------------------
+dependencies = [
+    # ── Web / API ─────────────────────────────────────────────────────────────
+    "fastapi>=0.115",                 # Web 框架
+    "uvicorn[standard]>=0.32",        # ASGI server
+    "python-multipart>=0.0.9",        # 表单 / 文件上传
+
+    # ── 数据校验 / 配置 ───────────────────────────────────────────────────────
+    "pydantic>=2.7",                  # 数据校验
+    "pydantic-settings>=2.3",         # 配置聚合
+
+    # ── 数据库 ───────────────────────────────────────────────────────────────
+    "sqlalchemy[asyncio]>=2.0.30",    # ORM（异步使用）
+    "asyncpg>=0.29",                  # PostgreSQL 异步驱动（运行时）
+    "psycopg2-binary>=2.9",           # PostgreSQL 同步驱动（Alembic 迁移用）
+    "alembic>=1.13",                  # 迁移工具
+
+    # ── 缓存 / 异步任务 ───────────────────────────────────────────────────────
+    "redis>=5.0",                     # Redis 客户端
+    "arq>=0.26",                      # 异步任务框架（协议敏感库，升级需跑全量测试）
+
+    # ── 对象存储 ──────────────────────────────────────────────────────────────
+    "minio>=7.2",                     # MinIO / S3 兼容对象存储
+
+    # ── 鉴权 ─────────────────────────────────────────────────────────────────
+    "python-jose[cryptography]>=3.3", # JWT 编解码
+    "bcrypt>=4.1",                    # 密码哈希
+    "email-validator>=2.0",           # 邮箱校验
+
+    # ── 文档解析 ──────────────────────────────────────────────────────────────
+    "liteparse>=2.0",                 # PDF 主解析（PDFium，OCR 默认关闭）
+    "pypdf>=4.2",                     # PDF 文本层兜底解析
+
+    # ── HTTP 客户端 ───────────────────────────────────────────────────────────
+    "httpx>=0.27",                    # 异步 HTTP（LLM 集成 + 测试 TestClient）
+]
+
+# ------------------------------------------------------------------------------
+# 开发 / 测试依赖：uv sync 默认安装；生产镜像用 uv sync --frozen --no-dev 排除
+# ------------------------------------------------------------------------------
+[dependency-groups]
+dev = [
+    "ruff>=0.6.0",                    # 代码风格 + lint
+    "mypy>=1.10.0",                   # 类型检查
+    "pytest>=8.2",
+    "pytest-asyncio>=0.23",
+    "aiosqlite",                      # SQLite 异步驱动（过渡期单元测试用）
+    "fakeredis>=2.20",               # Redis fake（单元测试不依赖真实 Redis）
+]
+
+# ==============================================================================
+# uv 配置
+# ==============================================================================
+[tool.uv]
+package = false                       # 仅管理依赖 / venv，不把本项目当可安装包构建
+
+# ==============================================================================
+# pytest
+# ==============================================================================
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 pythonpath = ["."]
+markers = [
+    "integration: 需要真实 DB / Redis 的集成测试",
+]
+
+# ==============================================================================
+# ruff
+# ==============================================================================
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+extend-exclude = [".venv", "build", "dist", "migrations/versions"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes（未使用导入 / 变量）
+    "I",   # isort（导入排序）
+    "C",   # flake8-comprehensions
+    "B",   # flake8-bugbear
+]
+ignore = [
+    "E501",  # line too long（line-length 已覆盖）
+    "B008",  # 函数默认值里调用函数（FastAPI Depends() 必须如此）
+    "C901",  # 函数过长 / 过复杂
+    "B006",  # 可变默认值（按规则审查）
+    "B904",  # raise ... from err
+    "E741",  # 变量名与关键字相似
+    "E722",  # 裸 except
+    "B027",  # 抽象类空方法
+]
+
+[tool.ruff.lint.per-file-ignores]
+"__init__.py" = ["F401"]              # 允许 re-export
+"tests/**/*.py" = ["B", "F841"]      # 测试放宽 bugbear 与"建数据不引用句柄"的未用局部变量
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+combine-as-imports = true
+
+[tool.ruff.lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Depends", "fastapi.Query", "fastapi.Path", "fastapi.Body", "fastapi.Header"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
+
+# ==============================================================================
+# mypy
+# ==============================================================================
+[tool.mypy]
+python_version = "3.12"
+warn_return_any = false               # SQLAlchemy / async 大量 Any，关掉避免噪音
+warn_unused_configs = true
+warn_redundant_casts = true
+warn_unused_ignores = false
+disallow_untyped_defs = false         # 存量项目宽松起步
+disallow_incomplete_defs = false
+check_untyped_defs = true
+no_implicit_optional = false
+ignore_missing_imports = true
+
+[[tool.mypy.overrides]]
+module = ["tests.*"]
+disallow_untyped_defs = false
+check_untyped_defs = false
+
+[[tool.mypy.overrides]]
+module = ["arq.*", "aiosqlite.*", "jose.*", "minio.*", "liteparse.*", "pypdf.*", "fakeredis.*"]
+ignore_errors = true

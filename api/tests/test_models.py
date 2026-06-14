@@ -1,6 +1,6 @@
 import uuid
 
-from app.models import Department, KnowledgeBase, Team, User, UserTeam
+from app.models import Department, KnowledgeBase, User
 
 
 async def test_models_persist(session):

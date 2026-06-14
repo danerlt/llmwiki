@@ -1,4 +1,3 @@
-import uuid
 
 from app.models import KnowledgeBase, PageLink, Source, User, WikiPage
 from app.models.wiki_page import PAGE_TYPES

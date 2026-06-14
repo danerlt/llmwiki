@@ -1,6 +1,6 @@
 import pytest
-from app.repositories import kb_repo, org_repo, user_repo
 
+from app.repositories import kb_repo, org_repo, user_repo
 
 pytestmark = pytest.mark.asyncio
 

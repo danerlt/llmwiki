@@ -33,6 +33,10 @@ class Settings(BaseSettings):
     llm_api_key: str = ""
     llm_model: str = ""
 
+    # 向量/语义检索（本地 sentence-transformers，默认关闭；生产装好 ML 依赖后置 true 开启）
+    embeddings_enabled: bool = False
+    embeddings_model: str = "all-MiniLM-L6-v2"
+
     app_url: str = "http://localhost"
     app_env: str = "dev"  # 仅 dev/test/local 允许弱默认凭据，其它环境强制拒绝
     cors_origins: str = ""  # 逗号分隔的允许跨域来源；留空回退到 [app_url]

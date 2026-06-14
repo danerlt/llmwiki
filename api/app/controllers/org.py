@@ -9,7 +9,12 @@ from app.models import User
 from app.repositories import org_repo, user_repo
 from app.schemas.auth import UserOut
 from app.schemas.org import (
-    DepartmentCreate, DepartmentOut, TeamCreate, TeamMemberAdd, TeamOut, UserCreate,
+    DepartmentCreate,
+    DepartmentOut,
+    TeamCreate,
+    TeamMemberAdd,
+    TeamOut,
+    UserCreate,
 )
 from app.services import audit_service, org_service
 

@@ -6,12 +6,10 @@ import pytest_asyncio
 from app.models import KnowledgeBase, User
 from app.repositories import source_repo, wiki_repo
 from app.services import ingest_service
-from tests.fakes import FakeStorage
+from tests.fakes import FakeLLM, FakeStorage
 
 
-def _llm(analysis: dict, pages: list[dict]) -> "FakeLLM":
-    from tests.fakes import FakeLLM
-
+def _llm(analysis: dict, pages: list[dict]) -> FakeLLM:
     return FakeLLM([json.dumps(analysis), json.dumps(pages)])
 
 
