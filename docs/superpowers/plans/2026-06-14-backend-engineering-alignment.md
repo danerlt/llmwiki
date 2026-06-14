@@ -74,7 +74,8 @@
 2. 逐实体迁 repo → 类 + 单例 + 继承 BaseCrud；保留实体专属查询。
 3. 逐实体迁 service → 类 + 单例；事务边界从 controller 上移到 service（HTTP 一接口一事务）。
 4. controller 调用点改为 `xxx_service.method(...)`。
-**状态**：未开始
+**状态**：✅ 已完成（结构部分）。异步 `BaseCrud[ModelT]` 落地；15 个 repo 全迁类+单例+继承 BaseCrud，13 个 service 全迁类+单例；__init__ 重导出单例，调用点写法不变、行为零变化；跨 service 引用改直接子模块导入避免循环。全量 170 passed、ruff 全绿。
+> ⚠️ **保守取舍**：事务边界未从 controller 上移到 service（13 个 controller 的 `session.commit()` 维持原位）。该子项行为风险高、价值增量低，且 savepoint 测试基座对 commit 时序敏感，为守住全绿按 CLAUDE.md「增量优于大爆炸」暂不搬迁，留作后续单独项。
 
 ## 阶段 5：控制器迁移 + 收尾
 
