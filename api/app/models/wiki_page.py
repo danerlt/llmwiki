@@ -1,5 +1,6 @@
 import uuid
 from datetime import datetime
+from typing import Any
 
 from sqlalchemy import DateTime, ForeignKey, Index, String, Text, UniqueConstraint, Uuid, func
 from sqlalchemy.orm import Mapped, mapped_column
@@ -35,7 +36,7 @@ class WikiPage(Base):
     slug: Mapped[str] = mapped_column(String(512))
     page_type: Mapped[str] = mapped_column(String(32))
     content_md: Mapped[str] = mapped_column(Text, default="")
-    frontmatter: Mapped[dict] = mapped_column(JSON, default=dict)
+    frontmatter: Mapped[dict[str, Any]] = mapped_column(JSON, default=dict)
     source_ids: Mapped[list] = mapped_column(JSON, default=list)
     tags: Mapped[list] = mapped_column(JSON, default=list)
     # 语义检索向量（归一化 float 列表；未启用 embeddings 时为 None）。JSON 兼容 SQLite/PG。
