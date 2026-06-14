@@ -86,7 +86,8 @@
 1. 逐 controller 接 `@api_response`，`response_model=Response[T]`，移除内联 try/except 与越层逻辑。
 2. 同步更新 `test_api_*.py` 断言（body.success/code/data）。
 3. 收尾（与阶段 3-5 穿插）：arq enqueue pool 单例化 + 任务入参 Pydantic 化；慢请求 warn 日志 + 4xx/5xx 结构化错误日志 + `X-Process-Time-Ms` 响应头 + 连接池监控端点 + 健康检查访问日志过滤；DB 连接池参数（pool_recycle/size/overflow + command_timeout）+ 显式 autocommit/autoflush；迁移并发安全（entrypoint.sh + Redis 分布式锁 + 等待依赖）；`Mapped[dict[str,Any]]`、TimeUtils、Service docstring 补齐、新增模型索引入 `__table_args__`。
-**状态**：未开始
+**状态**：✅ 已完成（核心）。18 个 controller 成功响应全量包统一信封；业务异常转 AppException 树统一信封（框架级 422/404、SSE、文件下载、健康探针除外）。**并按老板新指令完成四层分层纠偏**：dict/list 返回端点改 Schema（activity/analytics/query_feedback/notifications）；**全部 18 个 controller 零 repo 直调、零 repo import**，repo 调用/权限/业务逻辑/commit/ORM→schema 转换全部下沉到 service（新建 wiki/comment/favorite/source/stats/activity/analytics 7 个 service，其余补方法），controller 仅「解析入参→调 service→return」，service 返回 Pydantic schema。全量 test_api_* 断言改解信封 data。收尾已做：X-Process-Time-Ms 响应头 + 慢请求(>1000ms) warn 日志。后端 170 passed、ruff 全绿、前端 build+10 测试绿。
+> 仍可选的收尾（未做，低优先）：arq pool 单例化、连接池参数(pool_recycle/size/overflow)、迁移并发分布式锁(entrypoint.sh)、连接池监控端点。事务边界(commit)已随 MVC 下沉到 service 层。
 
 ---
 

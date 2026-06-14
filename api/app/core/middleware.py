@@ -21,6 +21,8 @@ request_id_ctx: ContextVar[str] = ContextVar("request_id", default="-")
 
 _access_logger = logging.getLogger("app.access")
 
+_SLOW_REQUEST_MS = 1000  # 超过此耗时的请求记 warning，便于线上定位慢接口
+
 _SECURITY_HEADERS = {
     "X-Content-Type-Options": "nosniff",
     "X-Frame-Options": "DENY",
@@ -75,8 +77,17 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         _access_logger.info(
             "%s %s -> %s %.1fms", request.method, request.url.path, response.status_code, dur_ms
         )
+        if dur_ms > _SLOW_REQUEST_MS:
+            _access_logger.warning(
+                "慢请求 %s %s 耗时 %.1fms (>%dms)",
+                request.method,
+                request.url.path,
+                dur_ms,
+                _SLOW_REQUEST_MS,
+            )
         metrics.observe(request.method, response.status_code, dur_ms / 1000)
         response.headers["X-Request-ID"] = rid
+        response.headers["X-Process-Time-Ms"] = f"{dur_ms:.1f}"
         for key, value in _SECURITY_HEADERS.items():
             response.headers.setdefault(key, value)
         return response
