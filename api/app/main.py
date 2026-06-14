@@ -3,6 +3,7 @@ import logging
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.controllers import (
     analytics,
@@ -44,6 +45,8 @@ def create_app() -> FastAPI:
     )
     app.add_middleware(RequestContextMiddleware)
     app.add_middleware(RateLimitMiddleware)
+    if settings.allowed_host_list:  # 仅在显式配置时启用 Host 白名单，防 Host 头注入
+        app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_host_list)
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:

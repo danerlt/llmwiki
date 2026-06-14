@@ -28,6 +28,16 @@ def test_prod_accepts_strong_secrets():
     assert s.app_env == "prod"
 
 
+def test_allowed_and_cors_host_parsing():
+    s = Settings(_env_file=None, allowed_hosts="a.com, b.com ,", cors_origins="https://x.com")
+    assert s.allowed_host_list == ["a.com", "b.com"]
+    assert s.cors_origin_list == ["https://x.com"]
+    # 留空时 allowed_host_list 为空（不启用），cors 回退 app_url
+    s2 = Settings(_env_file=None)
+    assert s2.allowed_host_list == []
+    assert s2.cors_origin_list == [s2.app_url]
+
+
 def test_dev_keeps_defaults_usable():
     s = Settings(_env_file=None)  # 默认 app_env=dev，弱默认不报错（本地/测试可用）
     assert s.jwt_secret == "change-me-in-prod"

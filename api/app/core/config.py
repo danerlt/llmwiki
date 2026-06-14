@@ -35,12 +35,17 @@ class Settings(BaseSettings):
     app_url: str = "http://localhost"
     app_env: str = "dev"  # 仅 dev/test/local 允许弱默认凭据，其它环境强制拒绝
     cors_origins: str = ""  # 逗号分隔的允许跨域来源；留空回退到 [app_url]
+    allowed_hosts: str = ""  # 逗号分隔的允许 Host；留空则不启用 TrustedHost 校验
 
     @property
     def cors_origin_list(self) -> list[str]:
         if self.cors_origins.strip():
             return [o.strip() for o in self.cors_origins.split(",") if o.strip()]
         return [self.app_url]
+
+    @property
+    def allowed_host_list(self) -> list[str]:
+        return [h.strip() for h in self.allowed_hosts.split(",") if h.strip()]
 
     @model_validator(mode="after")
     def _enforce_secret_strength(self) -> "Settings":
