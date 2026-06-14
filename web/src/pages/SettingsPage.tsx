@@ -1,9 +1,95 @@
-import { useState, type FormEvent } from "react";
-import { KeyRound } from "lucide-react";
+import { useEffect, useState, type FormEvent } from "react";
+import { KeyRound, Plug, Trash2 } from "lucide-react";
 
-import { postJson, setToken } from "../api/client";
+import { apiFetch, del, postJson, setToken } from "../api/client";
+import type { ApiKey } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { PageHeader } from "../components/ui";
+
+function ApiKeys() {
+  const [keys, setKeys] = useState<ApiKey[]>([]);
+  const [name, setName] = useState("");
+  const [created, setCreated] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  function load() {
+    apiFetch<ApiKey[]>("/api-keys").then(setKeys).catch(() => {});
+  }
+  useEffect(load, []);
+
+  async function create(e: FormEvent) {
+    e.preventDefault();
+    if (!name.trim()) return;
+    setBusy(true);
+    try {
+      const r = await postJson<ApiKey & { key: string }>("/api-keys", { name });
+      setCreated(r.key);
+      setName("");
+      load();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revoke(id: string) {
+    try {
+      await del(`/api-keys/${id}`);
+      load();
+    } catch {
+      /* ignore */
+    }
+  }
+
+  return (
+    <div className="card max-w-2xl p-6">
+      <h2 className="mb-1 flex items-center gap-1.5 font-display text-lg font-semibold">
+        <Plug className="h-4 w-4" /> API Key（服务账号）
+      </h2>
+      <p className="mb-4 text-xs text-ink-faint">
+        以你的身份编程访问 API：请求头带 <code className="font-mono">X-API-Key: &lt;key&gt;</code>。密钥仅创建时显示一次。
+      </p>
+      {created && (
+        <div className="mb-4 rounded-xl border border-accent/40 bg-accent-soft p-3 text-sm">
+          <div className="mb-1 font-medium text-accent-dark">新密钥（请立即复制，仅显示一次）</div>
+          <code className="block break-all font-mono text-xs text-ink">{created}</code>
+        </div>
+      )}
+      <form onSubmit={create} className="mb-4 flex flex-wrap gap-2">
+        <input
+          className="field max-w-[16rem]"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="密钥名称（如 ci-bot）"
+        />
+        <button className="btn-primary" disabled={busy || !name.trim()}>
+          生成密钥
+        </button>
+      </form>
+      {keys.length > 0 && (
+        <ul className="divide-y divide-line rounded-xl border border-line">
+          {keys.map((k) => (
+            <li key={k.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
+              <span className={`font-medium ${k.revoked ? "text-ink-faint line-through" : "text-ink"}`}>
+                {k.name}
+              </span>
+              <span className="font-mono text-xs text-ink-faint">lk_{k.prefix}_…</span>
+              {k.revoked && <span className="text-xs text-red-500">已吊销</span>}
+              {!k.revoked && (
+                <button
+                  onClick={() => revoke(k.id)}
+                  className="ml-auto text-ink-faint transition hover:text-red-600"
+                  title="吊销"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                </button>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -45,7 +131,7 @@ export default function SettingsPage() {
   }
 
   return (
-    <div>
+    <div className="space-y-6">
       <PageHeader title="账号设置" subtitle={user?.email} />
       <div className="card max-w-md p-6">
         <h2 className="mb-4 flex items-center gap-1.5 font-display text-lg font-semibold">
@@ -83,6 +169,7 @@ export default function SettingsPage() {
           </button>
         </form>
       </div>
+      <ApiKeys />
     </div>
   );
 }

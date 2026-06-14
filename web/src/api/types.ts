@@ -64,6 +64,14 @@ export interface SourceOut {
   error: string | null;
   job_id: string | null;
 }
+export interface ApiKey {
+  id: string;
+  name: string;
+  prefix: string;
+  revoked: boolean;
+  created_at: string;
+  last_used_at: string | null;
+}
 export interface NotificationItem {
   id: string;
   type: string;

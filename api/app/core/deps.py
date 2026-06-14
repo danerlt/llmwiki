@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import Depends, HTTPException, status
+from fastapi import Depends, Header, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -9,14 +9,24 @@ from app.core.security import decode_token
 from app.db.session import get_db
 from app.models import User
 from app.repositories import user_repo
+from app.services import api_key_service
 
-bearer = HTTPBearer(auto_error=True)
+bearer = HTTPBearer(auto_error=False)
 
 
 async def get_current_user(
-    creds: HTTPAuthorizationCredentials = Depends(bearer),
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+    x_api_key: str | None = Header(default=None, alias="X-API-Key"),
     session: AsyncSession = Depends(get_db),
 ) -> User:
+    # 服务账号：X-API-Key 优先；解析为 owner 用户
+    if x_api_key:
+        user = await api_key_service.resolve(session, x_api_key)
+        if user is None:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid api key")
+        return user
+    if creds is None:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="not authenticated")
     try:
         payload = decode_token(creds.credentials)
         user_id = payload["sub"]

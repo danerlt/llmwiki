@@ -1,4 +1,5 @@
 from app.models.answer_feedback import AnswerFeedback
+from app.models.api_key import ApiKey
 from app.models.audit_event import AuditEvent
 from app.models.comment import Comment
 from app.models.department import Department
@@ -16,6 +17,7 @@ from app.models.wiki_page import WikiPage
 
 __all__ = [
     "AnswerFeedback",
+    "ApiKey",
     "AuditEvent",
     "Comment",
     "Department",
