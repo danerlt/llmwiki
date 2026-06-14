@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -7,8 +7,9 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.integrations.llm import LLMClient
 from app.models import User
-from app.schemas.query import AnswerOut, QueryRequest
-from app.services import query_service
+from app.repositories import feedback_repo
+from app.schemas.query import AnswerOut, FeedbackRequest, QueryRequest
+from app.services import audit_service, query_service
 
 router = APIRouter(tags=["query"])
 
@@ -30,6 +31,24 @@ async def query(
     return await query_service.answer(
         session, user, body.question, kb_scope=body.kb_scope, llm=llm, history=history
     )
+
+
+@router.post("/query/feedback", status_code=status.HTTP_201_CREATED)
+async def query_feedback(
+    body: FeedbackRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> dict:
+    """记录问答答案反馈（赞/踩），用于度量与迭代 AI 质量。"""
+    await feedback_repo.create(
+        session, user_id=user.id, question=body.question, answer=body.answer, vote=body.vote
+    )
+    await audit_service.record(
+        session, actor_id=user.id, action="answer.feedback", target_type="query",
+        detail={"vote": body.vote},
+    )
+    await session.commit()
+    return {"ok": True}
 
 
 @router.post("/query/stream")

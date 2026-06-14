@@ -1,4 +1,5 @@
 import uuid
+from typing import Literal
 
 from pydantic import BaseModel, Field
 
@@ -12,6 +13,12 @@ class QueryRequest(BaseModel):
     question: str = Field(min_length=1, max_length=2000)
     kb_scope: list[uuid.UUID] | None = None
     history: list[ChatTurn] | None = Field(default=None, max_length=20)  # 多轮上下文
+
+
+class FeedbackRequest(BaseModel):
+    question: str = Field(min_length=1, max_length=2000)
+    answer: str = Field(min_length=1, max_length=20000)
+    vote: Literal["up", "down"]
 
 
 class Citation(BaseModel):

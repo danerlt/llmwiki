@@ -52,6 +52,28 @@ async def test_query_rejects_overlong_question(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_query_feedback_recorded(session, client):
+    alice, _, _ = await _two_dept_kbs_with_pages(session)
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: alice
+    try:
+        r = await client.post(
+            "/api/query/feedback",
+            json={"question": "后端", "answer": "后端用 Python。", "vote": "up"},
+        )
+        assert r.status_code == 201
+        from app.repositories import feedback_repo
+
+        assert (await feedback_repo.counts(session)).get("up") == 1
+        # 非法 vote 被拒
+        bad = await client.post(
+            "/api/query/feedback", json={"question": "x", "answer": "y", "vote": "meh"}
+        )
+        assert bad.status_code == 422
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_query_stream_emits_deltas_and_citations(session, client):
     alice, backend_kb, frontend_kb = await _two_dept_kbs_with_pages(session)
     await session.commit()
