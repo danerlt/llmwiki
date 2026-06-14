@@ -1,9 +1,20 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronRight, FileText, Inbox, Layers, Library, Search, Sparkles, Star } from "lucide-react";
+import {
+  Activity,
+  ChevronRight,
+  FileText,
+  Inbox,
+  Layers,
+  Library,
+  MessageSquare,
+  Search,
+  Sparkles,
+  Star,
+} from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
-import type { KB, PageOut, Stats } from "../api/types";
+import type { ActivityItem, KB, PageOut, Stats } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { Badge, EmptyState, Spinner } from "../components/ui";
 
@@ -33,12 +44,14 @@ export default function KbListPage() {
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<PageOut[]>([]);
   const [favs, setFavs] = useState<PageOut[]>([]);
+  const [acts, setActs] = useState<ActivityItem[]>([]);
   const [kbs, setKbs] = useState<KB[] | null>(null);
 
   useEffect(() => {
     apiFetch<Stats>("/stats").then(setStats).catch(() => {});
     apiFetch<PageOut[]>("/recent-pages").then(setRecent).catch(() => {});
     apiFetch<PageOut[]>("/favorites").then(setFavs).catch(() => {});
+    apiFetch<ActivityItem[]>("/activity").then(setActs).catch(() => {});
     apiFetch<KB[]>("/kbs").then(setKbs).catch(() => {});
   }, []);
 
@@ -96,19 +109,32 @@ export default function KbListPage() {
         </section>
 
         <section>
-          <h2 className="mb-3 font-display text-lg font-semibold tracking-tight">最近更新</h2>
-          {recent.length === 0 ? (
-            <p className="text-sm text-ink-faint">还没有页面</p>
+          <h2 className="mb-3 flex items-center gap-1.5 font-display text-lg font-semibold tracking-tight">
+            <Activity className="h-4 w-4" /> 动态
+          </h2>
+          {acts.length === 0 ? (
+            <p className="text-sm text-ink-faint">
+              {recent.length === 0 ? "还没有页面" : "暂无动态"}
+            </p>
           ) : (
             <ul className="card divide-y divide-line overflow-hidden">
-              {recent.map((p) => (
-                <li key={p.id}>
+              {acts.map((a, i) => (
+                <li key={i}>
                   <Link
-                    to={`/pages/${p.id}`}
+                    to={`/pages/${a.page_id}`}
                     className="flex items-center gap-2.5 px-4 py-3 text-sm transition hover:bg-paper"
                   >
-                    <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
-                    <span className="flex-1 truncate text-ink">{p.title}</span>
+                    {a.type === "page.commented" ? (
+                      <MessageSquare className="h-4 w-4 shrink-0 text-ink-faint" />
+                    ) : (
+                      <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
+                    )}
+                    <span className="flex-1 truncate text-ink">{a.text}</span>
+                    {a.at && (
+                      <span className="shrink-0 text-xs text-ink-faint">
+                        {new Date(a.at).toLocaleDateString()}
+                      </span>
+                    )}
                   </Link>
                 </li>
               ))}

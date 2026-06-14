@@ -74,6 +74,13 @@ export interface ApiKey {
   created_at: string;
   last_used_at: string | null;
 }
+export interface ActivityItem {
+  type: string;
+  page_id: string;
+  title: string;
+  at: string | null;
+  text: string;
+}
 export interface NotificationItem {
   id: string;
   type: string;

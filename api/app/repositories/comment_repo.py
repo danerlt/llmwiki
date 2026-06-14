@@ -1,9 +1,9 @@
 import uuid
 
-from sqlalchemy import select
+from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Comment
+from app.models import Comment, WikiPage
 
 
 async def create(
@@ -31,6 +31,22 @@ async def list_by_page(session: AsyncSession, page_id: uuid.UUID) -> list[Commen
         select(Comment).where(Comment.page_id == page_id).order_by(Comment.created_at)
     )
     return list(res.scalars().all())
+
+
+async def recent_in_kbs(
+    session: AsyncSession, kb_ids: list[uuid.UUID], limit: int = 20
+) -> list[tuple[Comment, WikiPage]]:
+    """可见 KB 内最近评论（连同所属页），用于活动流。"""
+    if not kb_ids:
+        return []
+    res = await session.execute(
+        select(Comment, WikiPage)
+        .join(WikiPage, Comment.page_id == WikiPage.id)
+        .where(WikiPage.kb_id.in_(kb_ids))
+        .order_by(desc(Comment.created_at))
+        .limit(limit)
+    )
+    return [(row[0], row[1]) for row in res.all()]
 
 
 async def delete(session: AsyncSession, comment_id: uuid.UUID) -> None:

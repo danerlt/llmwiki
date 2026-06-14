@@ -6,6 +6,7 @@ from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.controllers import (
+    activity,
     analytics,
     api_keys,
     audit,
@@ -73,6 +74,7 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
     app.include_router(analytics.router, prefix="/api")
+    app.include_router(activity.router, prefix="/api")
     app.include_router(webhooks.router, prefix="/api")
     return app
 
