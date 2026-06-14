@@ -17,6 +17,7 @@ router = APIRouter(tags=["search"])
 async def search(
     q: str = Query(..., min_length=1, max_length=500),
     kb: list[uuid.UUID] | None = Query(default=None),
+    page_type: str | None = Query(default=None, description="按页类型过滤"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
@@ -24,6 +25,7 @@ async def search(
         p
         for p in await retrieval_service.retrieve(session, user, q, kb_scope=kb)
         if p.page_type != "index"  # 目录页不进搜索结果
+        and (page_type is None or p.page_type == page_type)
     ]
     terms = _query_terms(q)
     hits: list[SearchHit] = []

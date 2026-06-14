@@ -52,6 +52,21 @@ async def test_query_rejects_overlong_question(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_search_filters_by_page_type(session, client):
+    alice, backend_kb, _ = await _two_dept_kbs_with_pages(session)
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: alice
+    try:
+        # backend_kb 的页是 entity 类型
+        ent = await client.get("/api/search", params={"q": "后端", "page_type": "entity"})
+        assert ent.status_code == 200 and len(ent.json()) >= 1
+        # 过滤为 overview → 无结果
+        ov = await client.get("/api/search", params={"q": "后端", "page_type": "overview"})
+        assert ov.json() == []
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_query_feedback_recorded(session, client):
     alice, _, _ = await _two_dept_kbs_with_pages(session)
     await session.commit()

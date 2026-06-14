@@ -28,22 +28,41 @@ function highlight(text: string, term: string): ReactNode {
   );
 }
 
+const TYPES = [
+  { v: "", label: "全部" },
+  { v: "overview", label: "概览" },
+  { v: "entity", label: "实体" },
+  { v: "concept", label: "概念" },
+  { v: "source_summary", label: "源摘要" },
+];
+
 export default function SearchPage() {
   const [q, setQ] = useState("");
+  const [type, setType] = useState("");
   const [hits, setHits] = useState<SearchHit[]>([]);
   const [searched, setSearched] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  async function onSearch(e: FormEvent) {
-    e.preventDefault();
+  async function doSearch(t: string) {
     if (!q.trim()) return;
     setLoading(true);
     try {
-      setHits(await apiFetch<SearchHit[]>(`/search?q=${encodeURIComponent(q)}`));
+      const tq = t ? `&page_type=${t}` : "";
+      setHits(await apiFetch<SearchHit[]>(`/search?q=${encodeURIComponent(q)}${tq}`));
       setSearched(true);
     } finally {
       setLoading(false);
     }
+  }
+
+  function onSearch(e: FormEvent) {
+    e.preventDefault();
+    void doSearch(type);
+  }
+
+  function pickType(t: string) {
+    setType(t);
+    void doSearch(t);
   }
 
   return (
@@ -62,6 +81,24 @@ export default function SearchPage() {
           {loading ? "搜索中…" : "搜索"}
         </button>
       </form>
+      {searched && (
+        <div className="mb-4 flex flex-wrap gap-2">
+          {TYPES.map((t) => (
+            <button
+              key={t.v}
+              type="button"
+              onClick={() => pickType(t.v)}
+              className={`chip transition ${
+                type === t.v
+                  ? "border-accent/50 bg-accent-soft text-accent-dark"
+                  : "hover:border-accent/40 hover:text-accent-dark"
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      )}
       {searched && hits.length > 0 && (
         <p className="mb-3 text-sm text-ink-muted">找到 {hits.length} 个结果</p>
       )}
