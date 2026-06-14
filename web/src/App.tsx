@@ -16,6 +16,7 @@ import PageHistoryPage from "./pages/PageHistoryPage";
 import QueryPage from "./pages/QueryPage";
 import ReviewsPage from "./pages/ReviewsPage";
 import SearchPage from "./pages/SearchPage";
+import SettingsPage from "./pages/SettingsPage";
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
             <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/audit" element={<AuditPage />} />
+            <Route path="/settings" element={<SettingsPage />} />
           </Route>
         </Route>
       </Routes>

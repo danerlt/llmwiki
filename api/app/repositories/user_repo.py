@@ -41,6 +41,12 @@ async def list_all(session: AsyncSession) -> list[User]:
     return list(res.scalars().all())
 
 
+async def set_password(session: AsyncSession, user_id: uuid.UUID, password_hash: str) -> None:
+    await session.execute(
+        update(User).where(User.id == user_id).values(password_hash=password_hash)
+    )
+
+
 async def bump_token_version(session: AsyncSession, user_id: uuid.UUID) -> None:
     """自增会话版本：使该用户所有存量 JWT 失效（登出/封禁/改密）。"""
     await session.execute(

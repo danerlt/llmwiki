@@ -8,10 +8,11 @@ import {
   LogOut,
   ScrollText,
   Search,
+  Settings,
   Sparkles,
   Users,
 } from "lucide-react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
@@ -114,6 +115,13 @@ export default function Layout() {
             <div className="truncate text-sm font-medium text-ink">{user?.display_name}</div>
             <div className="text-xs text-ink-faint">{isAdmin ? "管理员" : "成员"}</div>
           </div>
+          <Link
+            to="/settings"
+            title="账号设置"
+            className="text-ink-faint transition hover:text-ink"
+          >
+            <Settings className="h-[18px] w-[18px]" />
+          </Link>
           <button
             onClick={logout}
             title="退出登录"

@@ -2,11 +2,11 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
-from app.core.security import create_access_token
+from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import User
 from app.repositories import user_repo
-from app.schemas.auth import LoginRequest, TokenResponse, UserOut
+from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserOut
 from app.services import auth_service
 
 router = APIRouter(tags=["auth"])
@@ -29,6 +29,24 @@ async def logout(
     """服务端登出：自增 token_version，使该用户所有存量令牌立即失效。"""
     await user_repo.bump_token_version(session, user.id)
     await session.commit()
+
+
+@router.post("/auth/change-password", response_model=TokenResponse)
+async def change_password(
+    body: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> TokenResponse:
+    """自助改密：校验旧密码 → 更新 → 自增 token_version 使其它会话失效 → 回签新令牌保当前会话。"""
+    if not verify_password(body.old_password, user.password_hash):
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="旧密码不正确")
+    await user_repo.set_password(session, user.id, hash_password(body.new_password))
+    await user_repo.bump_token_version(session, user.id)
+    await session.commit()
+    fresh = await user_repo.get_by_id(session, user.id)
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), token_version=fresh.token_version)
+    )
 
 
 @router.get("/me", response_model=UserOut)
