@@ -2,7 +2,7 @@ import { useState, type FormEvent } from "react";
 import { ArrowRight, Sparkles } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-import { postJson } from "../api/client";
+import { postJson, setRefreshToken } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
 export default function LoginPage() {
@@ -18,7 +18,11 @@ export default function LoginPage() {
     setErr("");
     setLoading(true);
     try {
-      const r = await postJson<{ access_token: string }>("/auth/login", { email, password });
+      const r = await postJson<{ access_token: string; refresh_token?: string }>("/auth/login", {
+        email,
+        password,
+      });
+      if (r.refresh_token) setRefreshToken(r.refresh_token);
       await login(r.access_token);
       navigate("/");
     } catch {

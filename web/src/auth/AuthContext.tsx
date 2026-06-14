@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from "react";
 
-import { apiFetch, getToken, setToken } from "../api/client";
+import { apiFetch, getToken, setRefreshToken, setToken } from "../api/client";
 import type { UserOut } from "../api/types";
 
 interface AuthState {
@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       /* best-effort */
     }
     setToken(null);
+    setRefreshToken(null);
     setUser(null);
   }
 

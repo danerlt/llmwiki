@@ -2,11 +2,27 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
-from app.core.security import create_access_token, hash_password, verify_password
+import uuid
+
+from jose import JWTError
+
+from app.core.security import (
+    create_access_token,
+    create_refresh_token,
+    decode_token,
+    hash_password,
+    verify_password,
+)
 from app.db.session import get_db
 from app.models import User
 from app.repositories import api_key_repo, comment_repo, favorite_repo, user_repo
-from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserOut
+from app.schemas.auth import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RefreshRequest,
+    TokenResponse,
+    UserOut,
+)
 from app.services import auth_service
 
 router = APIRouter(tags=["auth"])
@@ -25,7 +41,26 @@ async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> 
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="bad credentials")
     auth_service.clear_failures(body.email)
     return TokenResponse(
-        access_token=create_access_token(str(user.id), token_version=user.token_version)
+        access_token=create_access_token(str(user.id), token_version=user.token_version),
+        refresh_token=create_refresh_token(str(user.id), token_version=user.token_version),
+    )
+
+
+@router.post("/auth/refresh", response_model=TokenResponse)
+async def refresh(body: RefreshRequest, session: AsyncSession = Depends(get_db)) -> TokenResponse:
+    """用刷新令牌换取新的访问令牌（校验 type/exp/token_version 与账号有效）。"""
+    try:
+        payload = decode_token(body.refresh_token)
+    except JWTError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="invalid refresh token")
+    if payload.get("type") != "refresh":
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="not a refresh token")
+    user = await user_repo.get_by_id(session, uuid.UUID(payload["sub"]))
+    if user is None or not user.is_active or payload.get("tv", 0) != user.token_version:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="refresh token revoked")
+    return TokenResponse(
+        access_token=create_access_token(str(user.id), token_version=user.token_version),
+        refresh_token=create_refresh_token(str(user.id), token_version=user.token_version),
     )
 
 

@@ -19,7 +19,8 @@ class Settings(BaseSettings):
     rate_limit_per_min: int = 0  # 每 IP 每分钟请求上限，<=0 关闭（生产按需开启）
 
     jwt_secret: str = "change-me-in-prod"
-    jwt_expire_min: int = 480  # 8h，缩短被盗令牌的有效窗口（配合 token_version 吊销）
+    jwt_expire_min: int = 480  # 8h 访问令牌（配合 token_version 吊销）
+    refresh_expire_min: int = 10080  # 7 天刷新令牌
 
     minio_endpoint: str = "minio:9000"
     minio_access_key: str = "minioadmin"

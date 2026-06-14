@@ -29,6 +29,24 @@ async def test_logout_revokes_existing_token(client, session):
     assert (await client.get("/api/me", headers=auth)).status_code == 401
 
 
+async def test_refresh_token_issues_new_access(client, session):
+    await org_service.create_user(session, email="r@x.com", password="pw123456", display_name="R")
+    await session.commit()
+    login = await client.post("/api/auth/login", json={"email": "r@x.com", "password": "pw123456"})
+    refresh_tok = login.json()["refresh_token"]
+    assert refresh_tok
+    # 用 refresh 换新 access
+    r = await client.post("/api/auth/refresh", json={"refresh_token": refresh_tok})
+    assert r.status_code == 200
+    new_access = r.json()["access_token"]
+    assert (
+        await client.get("/api/me", headers={"Authorization": f"Bearer {new_access}"})
+    ).status_code == 200
+    # access 令牌不能当 refresh 用
+    bad = await client.post("/api/auth/refresh", json={"refresh_token": new_access})
+    assert bad.status_code == 401
+
+
 async def test_change_password_rotates_sessions(client, session):
     await org_service.create_user(session, email="u@x.com", password="pw123456", display_name="U")
     await session.commit()

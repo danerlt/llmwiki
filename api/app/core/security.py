@@ -29,5 +29,14 @@ def create_access_token(
     )
 
 
+def create_refresh_token(subject: str, token_version: int = 0) -> str:
+    expire = datetime.now(timezone.utc) + timedelta(minutes=settings.refresh_expire_min)
+    return jwt.encode(
+        {"sub": subject, "tv": token_version, "type": "refresh", "exp": expire},
+        settings.jwt_secret,
+        algorithm=ALGORITHM,
+    )
+
+
 def decode_token(token: str) -> dict:
     return jwt.decode(token, settings.jwt_secret, algorithms=[ALGORITHM])
