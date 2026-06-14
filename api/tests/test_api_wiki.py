@@ -101,6 +101,22 @@ async def test_page_tags_create_and_filter(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_export_page_markdown(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        pid = (
+            await client.post(
+                f"/api/kbs/{kb.id}/pages", json={"title": "导出页", "content_md": "正文内容"}
+            )
+        ).json()["id"]
+        r = await client.get(f"/api/pages/{pid}/markdown")
+        assert r.status_code == 200 and "text/markdown" in r.headers["content-type"]
+        assert "# 导出页" in r.text and "正文内容" in r.text
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_page_verify_and_unverify(session, client):
     admin, kb = await _admin_company_kb(session)
     app.dependency_overrides[get_current_user] = lambda: admin

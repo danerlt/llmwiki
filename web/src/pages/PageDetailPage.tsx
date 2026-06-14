@@ -3,6 +3,7 @@ import {
   ArrowRight,
   ArrowUpRight,
   Bell,
+  Download,
   ChevronRight,
   FileText,
   Files,
@@ -15,7 +16,7 @@ import {
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
-import { ApiError, apiFetch, del, postJson } from "../api/client";
+import { ApiError, apiFetch, del, getToken, postJson } from "../api/client";
 import type { KB, PageDetail, PageOut } from "../api/types";
 import Comments from "../components/Comments";
 import Markdown from "../components/Markdown";
@@ -101,6 +102,20 @@ export default function PageDetailPage() {
     } catch {
       setFav(!next); // 失败回滚
     }
+  }
+
+  async function exportMd() {
+    const res = await fetch(`/api/pages/${pageId}/markdown`, {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `${page?.slug ?? "page"}.md`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function toggleVerify() {
@@ -195,6 +210,9 @@ export default function PageDetailPage() {
             <Link to={`/pages/${page.id}/history`} className="btn-ghost">
               <History className="h-4 w-4" /> 历史
             </Link>
+            <button onClick={exportMd} className="btn-ghost" title="导出 Markdown">
+              <Download className="h-4 w-4" /> 导出
+            </button>
           </div>
         )}
       </div>

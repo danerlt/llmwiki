@@ -1,7 +1,9 @@
 import uuid
 from datetime import datetime, timezone
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -266,6 +268,30 @@ async def revert_page(
     await session.commit()
     accessible = await permission_service.accessible_kb_ids(session, user)
     return await _build_detail(session, page, accessible)
+
+
+@router.get("/pages/{page_id}/markdown")
+async def export_page_markdown(
+    page_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> Response:
+    """导出页面为 Markdown 文件（含 frontmatter 标题）。需读权限。"""
+    page = await wiki_repo.get_by_id(session, page_id)
+    if page is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+    accessible = await permission_service.accessible_kb_ids(session, user)
+    if page.kb_id not in accessible:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+    body = f"# {page.title}\n\n{page.content_md or ''}\n"
+    # 文件名可能含非 ASCII：ASCII 兜底 + RFC 5987 filename* 提供 UTF-8 原名
+    ascii_name = page.slug.encode("ascii", "ignore").decode() or "page"
+    disp = f"attachment; filename=\"{ascii_name}.md\"; filename*=UTF-8''{quote(page.slug)}.md"
+    return Response(
+        content=body,
+        media_type="text/markdown; charset=utf-8",
+        headers={"Content-Disposition": disp},
+    )
 
 
 @router.post("/pages/{page_id}/verify", response_model=PageDetailOut)
