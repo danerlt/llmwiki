@@ -16,6 +16,7 @@ import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
+import CommandPalette from "./CommandPalette";
 
 function NavItem({
   to,
@@ -68,6 +69,7 @@ export default function Layout() {
   }, []);
   return (
     <div className="flex min-h-screen">
+      <CommandPalette />
       <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-line bg-card/70 px-4 py-5 backdrop-blur-sm">
         <button
           onClick={() => navigate("/")}
