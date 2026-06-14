@@ -60,6 +60,7 @@ class PageDetailOut(PageOut):
     source_ids: list[str]
     updated_at: datetime | None = None
     is_favorited: bool = False
+    is_subscribed: bool = False
     backlinks: list[PageOut] = []
     outlinks: list[PageOut] = []
     sources: list[SourceRef] = []

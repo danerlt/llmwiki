@@ -7,7 +7,13 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.ingest import parser, pipeline
 from app.models import User
-from app.repositories import favorite_repo, kb_repo, source_repo, wiki_repo
+from app.repositories import (
+    favorite_repo,
+    kb_repo,
+    source_repo,
+    subscription_repo,
+    wiki_repo,
+)
 from app.schemas.wiki import (
     HUMAN_PAGE_TYPES,
     PageCreate,
@@ -17,13 +23,23 @@ from app.schemas.wiki import (
     PageVersionOut,
     SourceRef,
 )
-from app.services import audit_service, kb_service, permission_service
+from app.services import (
+    audit_service,
+    kb_service,
+    notification_service,
+    permission_service,
+)
 
 router = APIRouter(tags=["wiki"])
 
 
 async def _build_detail(
-    session: AsyncSession, page, accessible: set[uuid.UUID], *, is_favorited: bool = False
+    session: AsyncSession,
+    page,
+    accessible: set[uuid.UUID],
+    *,
+    is_favorited: bool = False,
+    is_subscribed: bool = False,
 ) -> PageDetailOut:
     backlinks = [b for b in await wiki_repo.backlinks(session, page.id) if b.kb_id in accessible]
     outlinks = [o for o in await wiki_repo.outlinks(session, page.id) if o.kb_id in accessible]
@@ -47,6 +63,7 @@ async def _build_detail(
         source_ids=[str(s) for s in (page.source_ids or [])],
         updated_at=page.updated_at,
         is_favorited=is_favorited,
+        is_subscribed=is_subscribed,
         backlinks=[
             PageOut(id=b.id, kb_id=b.kb_id, title=b.title, slug=b.slug, page_type=b.page_type)
             for b in backlinks
@@ -166,6 +183,10 @@ async def update_page(
         session, actor_id=user.id, action="page.update", target_type="page",
         target_id=page.id, detail={"kb_id": str(page.kb_id)},
     )
+    await notification_service.notify_watchers(
+        session, page_id=page.id, actor_id=user.id, type="page.updated",
+        message=f"{user.display_name} 编辑了《{page.title}》",
+    )
     await session.commit()
     accessible = await permission_service.accessible_kb_ids(session, user)
     return await _build_detail(session, page, accessible)
@@ -255,4 +276,5 @@ async def get_page(
     if page.kb_id not in accessible:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
     fav = await favorite_repo.exists(session, user_id=user.id, page_id=page.id)
-    return await _build_detail(session, page, accessible, is_favorited=fav)
+    sub = await subscription_repo.exists(session, user_id=user.id, page_id=page.id)
+    return await _build_detail(session, page, accessible, is_favorited=fav, is_subscribed=sub)

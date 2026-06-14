@@ -10,6 +10,7 @@ from app.controllers import (
     comments,
     favorites,
     health,
+    notifications,
     kb,
     org,
     query,
@@ -59,6 +60,7 @@ def create_app() -> FastAPI:
     app.include_router(wiki.router, prefix="/api")
     app.include_router(comments.router, prefix="/api")
     app.include_router(favorites.router, prefix="/api")
+    app.include_router(notifications.router, prefix="/api")
     app.include_router(reviews.router, prefix="/api")
     app.include_router(audit.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")

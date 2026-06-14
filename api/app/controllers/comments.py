@@ -8,7 +8,7 @@ from app.db.session import get_db
 from app.models import User
 from app.repositories import comment_repo, user_repo, wiki_repo
 from app.schemas.comment import CommentCreate, CommentOut
-from app.services import audit_service, permission_service
+from app.services import audit_service, notification_service, permission_service
 
 router = APIRouter(tags=["comments"])
 
@@ -51,11 +51,15 @@ async def add_comment(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
-    await _readable_page(session, page_id, user)  # 对页有读权限即可评论
+    page = await _readable_page(session, page_id, user)  # 对页有读权限即可评论
     c = await comment_repo.create(session, page_id=page_id, author_id=user.id, body=body.body)
     await session.flush()
     await audit_service.record(
         session, actor_id=user.id, action="comment.create", target_type="page", target_id=page_id
+    )
+    await notification_service.notify_watchers(
+        session, page_id=page_id, actor_id=user.id, type="page.commented",
+        message=f"{user.display_name} 评论了《{page.title}》",
     )
     await session.commit()
     return _out(c, user.display_name)
