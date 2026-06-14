@@ -60,6 +60,14 @@ export interface SourceOut {
   error: string | null;
   job_id: string | null;
 }
+export interface Comment {
+  id: string;
+  page_id: string;
+  author_id: string;
+  author_name: string;
+  body: string;
+  created_at: string;
+}
 export interface PageVersion {
   version_no: number;
   title: string;

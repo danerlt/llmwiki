@@ -7,6 +7,7 @@ from fastapi.responses import JSONResponse
 from app.controllers import (
     audit,
     auth,
+    comments,
     health,
     kb,
     org,
@@ -55,6 +56,7 @@ def create_app() -> FastAPI:
     app.include_router(search.router, prefix="/api")
     app.include_router(query.router, prefix="/api")
     app.include_router(wiki.router, prefix="/api")
+    app.include_router(comments.router, prefix="/api")
     app.include_router(reviews.router, prefix="/api")
     app.include_router(audit.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")

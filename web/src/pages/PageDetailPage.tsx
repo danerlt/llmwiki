@@ -13,6 +13,7 @@ import { Link, useParams } from "react-router-dom";
 
 import { ApiError, apiFetch, postJson } from "../api/client";
 import type { KB, PageDetail, PageOut } from "../api/types";
+import Comments from "../components/Comments";
 import Markdown from "../components/Markdown";
 import { Badge, Spinner } from "../components/ui";
 import { resolveWikilinks } from "../lib/wikilink";
@@ -128,8 +129,11 @@ export default function PageDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_17rem]">
-        <div className="card p-7">
-          <Markdown content={resolveWikilinks(page.content_md, slugMap)} />
+        <div>
+          <div className="card p-7">
+            <Markdown content={resolveWikilinks(page.content_md, slugMap)} />
+          </div>
+          {page.page_type !== "index" && <Comments pageId={page.id} />}
         </div>
 
         <aside className="space-y-4">
