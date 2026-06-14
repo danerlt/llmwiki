@@ -1,3 +1,11 @@
+// 后端统一响应信封（阶段3 起逐步铺开；client.ts 单点拆包，调用方拿到的是 data）
+export interface ApiResponse<T = unknown> {
+  success: boolean;
+  code: string;
+  message: string;
+  data: T | null;
+  request_id?: string | null;
+}
 export interface UserOut {
   id: string;
   email: string;

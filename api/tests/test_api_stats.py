@@ -20,6 +20,6 @@ async def test_stats_and_kb_page_count(session, client):
         body = r.json()
         assert body["page_count"] >= 1 and body["kb_count"] >= 1
         kbs = await client.get("/api/kbs")
-        assert any(k["page_count"] >= 1 for k in kbs.json())  # /kbs 现在带页数
+        assert any(k["page_count"] >= 1 for k in kbs.json()["data"])  # /kbs 信封内 data, 带页数
     finally:
         app.dependency_overrides.pop(get_current_user, None)

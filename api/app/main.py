@@ -5,6 +5,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
+from app.common.exception_handler import register_exception
 from app.controllers import (
     activity,
     analytics,
@@ -48,6 +49,8 @@ def create_app() -> FastAPI:
     app.add_middleware(RateLimitMiddleware)
     if settings.allowed_host_list:  # 仅在显式配置时启用 Host 白名单，防 Host 头注入
         app.add_middleware(TrustedHostMiddleware, allowed_hosts=settings.allowed_host_list)
+
+    register_exception(app)  # AppException 树 → 统一信封（阶段3 起；存量 HTTPException 行为不变）
 
     @app.exception_handler(Exception)
     async def _unhandled(request: Request, exc: Exception) -> JSONResponse:

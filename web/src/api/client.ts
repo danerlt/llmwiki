@@ -16,6 +16,8 @@ export function setRefreshToken(token: string | null): void {
   else localStorage.removeItem(REFRESH_KEY);
 }
 
+import type { ApiResponse } from "./types";
+
 export class ApiError extends Error {
   constructor(
     public status: number,
@@ -23,6 +25,29 @@ export class ApiError extends Error {
   ) {
     super(message);
   }
+}
+
+// 业务异常：后端统一信封 success:false 时抛出，带业务 code 与 request_id 供排查
+export class BusinessError extends Error {
+  constructor(
+    public code: string,
+    message: string,
+    public status: number,
+    public requestId: string | null = null,
+  ) {
+    super(message);
+  }
+}
+
+function isEnvelope(p: unknown): p is ApiResponse {
+  return (
+    typeof p === "object" &&
+    p !== null &&
+    "success" in p &&
+    typeof (p as { success: unknown }).success === "boolean" &&
+    "code" in p &&
+    "data" in p
+  );
 }
 
 // 用刷新令牌换新访问令牌；并发去重，避免 401 风暴时重复刷新
@@ -73,9 +98,17 @@ export async function apiFetch<T = unknown>(
     if (location.pathname !== "/login") location.assign("/login");
     throw new ApiError(401, "unauthorized");
   }
-  if (!res.ok) throw new ApiError(res.status, await res.text());
   const ct = res.headers.get("content-type") ?? "";
-  return (ct.includes("application/json") ? await res.json() : await res.text()) as T;
+  const payload = ct.includes("application/json") ? await res.json() : await res.text();
+  // 统一信封 {success,code,message,data,request_id}：识别则拆包；未识别则按原行为透传（向后兼容）
+  if (isEnvelope(payload)) {
+    if (payload.success) return payload.data as T;
+    throw new BusinessError(payload.code, payload.message, res.status, payload.request_id ?? null);
+  }
+  if (!res.ok) {
+    throw new ApiError(res.status, typeof payload === "string" ? payload : JSON.stringify(payload));
+  }
+  return payload as T;
 }
 
 export async function postJson<T = unknown>(path: string, body: unknown): Promise<T> {

@@ -20,6 +20,10 @@ async def test_kb_listing_filtered_by_permission(client, session):
     r = await client.post("/api/auth/login", json={"email": "alice@x.com", "password": "pw123456"})
     token = r.json()["access_token"]
     r2 = await client.get("/api/kbs", headers={"Authorization": f"Bearer {token}"})
-    names = {kb["name"] for kb in r2.json()}
+    body = r2.json()
+    # 阶段3 灰度：/api/kbs 改走统一信封 Response[T]
+    assert body["success"] is True and body["code"] == "0"
+    assert body["request_id"]
+    names = {kb["name"] for kb in body["data"]}
     assert names == {"公司", "技术部", "后端组", "Alice 个人"}
     assert "前端组" not in names
