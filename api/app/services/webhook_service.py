@@ -2,16 +2,51 @@ import hashlib
 import hmac
 import json
 import logging
+import uuid
 
 import httpx
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.exceptions import NotFoundException
+from app.models import User
 from app.repositories import webhook_repo
+from app.schemas.webhook import WebhookCreate, WebhookOut
+from app.services.audit_service import audit_service
 
 _logger = logging.getLogger("app.webhook")
 
 
 class WebhookService:
+    async def list_webhooks(self, session: AsyncSession) -> list[WebhookOut]:
+        rows = await webhook_repo.list_all(session)
+        return [WebhookOut.model_validate(r) for r in rows]
+
+    async def create_webhook(
+        self, session: AsyncSession, actor: User, body: WebhookCreate
+    ) -> WebhookOut:
+        w = await webhook_repo.create(
+            session, created_by=actor.id, url=body.url, secret=body.secret
+        )
+        await audit_service.record(
+            session, actor_id=actor.id, action="webhook.create", target_type="webhook",
+            target_id=w.id, detail={"url": body.url},
+        )
+        await session.commit()
+        return WebhookOut.model_validate(w)
+
+    async def delete_webhook(
+        self, session: AsyncSession, actor: User, webhook_id: uuid.UUID
+    ) -> None:
+        w = await webhook_repo.get_by_id(session, webhook_id)
+        if w is None:
+            raise NotFoundException("webhook not found")
+        await session.delete(w)
+        await audit_service.record(
+            session, actor_id=actor.id, action="webhook.delete", target_type="webhook",
+            target_id=webhook_id,
+        )
+        await session.commit()
+
     def sign(self, secret: str, body: bytes) -> str:
         """HMAC-SHA256 签名，接收方据此验证来源与完整性。"""
         return hmac.new(secret.encode(), body, hashlib.sha256).hexdigest()

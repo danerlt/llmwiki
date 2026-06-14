@@ -3,8 +3,11 @@ from datetime import datetime, timezone
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.exceptions import ForbiddenException, NotFoundException
 from app.models import PromotionRequest, User
 from app.repositories import kb_repo, promotion_repo, user_repo, wiki_repo
+from app.schemas.promotion import PromotionOut
+from app.services.audit_service import audit_service
 from app.services.kb_service import kb_service
 from app.services.permission_service import permission_service
 
@@ -96,6 +99,92 @@ class PromotionService:
         pr.note = note or pr.note
         pr.decided_at = datetime.now(timezone.utc)
         return pr
+
+    async def _to_out(self, session: AsyncSession, pr: PromotionRequest) -> PromotionOut:
+        """ORM → schema：补齐源页标题与目标 KB 名称（容忍其已被删除）。"""
+        page = await wiki_repo.get_by_id(session, pr.page_id)
+        kb = await kb_repo.get_by_id(session, pr.to_kb_id)
+        return PromotionOut(
+            id=pr.id,
+            page_id=pr.page_id,
+            page_title=page.title if page else "(已删除)",
+            to_kb_id=pr.to_kb_id,
+            to_kb_name=kb.name if kb else "(未知)",
+            requested_by=pr.requested_by,
+            status=pr.status,
+            note=pr.note,
+        )
+
+    async def promote(
+        self,
+        session: AsyncSession,
+        user: User,
+        page_id: uuid.UUID,
+        to_kb_id: uuid.UUID,
+        note: str | None = None,
+    ) -> PromotionOut:
+        """端点编排：发起晋升申请、记审计、commit，返回展示态。"""
+        try:
+            pr = await self.request_promotion(session, user, page_id, to_kb_id, note=note)
+            await audit_service.record(
+                session,
+                actor_id=user.id,
+                action="promotion.request",
+                target_type="page",
+                target_id=page_id,
+                detail={"to_kb_id": str(to_kb_id)},
+            )
+        except PermissionError as e:
+            raise ForbiddenException(str(e)) from e
+        except LookupError as e:
+            raise NotFoundException(str(e)) from e
+        await session.commit()
+        return await self._to_out(session, pr)
+
+    async def list_reviews(self, session: AsyncSession, user: User) -> list[PromotionOut]:
+        """端点编排：列出当前用户可审核的待审请求（展示态）。"""
+        prs = await self.list_reviewable(session, user)
+        return [await self._to_out(session, pr) for pr in prs]
+
+    async def approve_request(
+        self, session: AsyncSession, user: User, pr_id: uuid.UUID
+    ) -> PromotionOut:
+        """端点编排：批准晋升、记审计、commit，返回展示态。"""
+        try:
+            pr = await self.approve(session, user, pr_id)
+            await audit_service.record(
+                session,
+                actor_id=user.id,
+                action="promotion.approve",
+                target_type="promotion",
+                target_id=pr_id,
+            )
+        except PermissionError as e:
+            raise ForbiddenException(str(e)) from e
+        except LookupError as e:
+            raise NotFoundException(str(e)) from e
+        await session.commit()
+        return await self._to_out(session, pr)
+
+    async def reject_request(
+        self, session: AsyncSession, user: User, pr_id: uuid.UUID, note: str | None = None
+    ) -> PromotionOut:
+        """端点编排：驳回晋升、记审计、commit，返回展示态。"""
+        try:
+            pr = await self.reject(session, user, pr_id, note=note)
+            await audit_service.record(
+                session,
+                actor_id=user.id,
+                action="promotion.reject",
+                target_type="promotion",
+                target_id=pr_id,
+            )
+        except PermissionError as e:
+            raise ForbiddenException(str(e)) from e
+        except LookupError as e:
+            raise NotFoundException(str(e)) from e
+        await session.commit()
+        return await self._to_out(session, pr)
 
 
 promotion_service = PromotionService()

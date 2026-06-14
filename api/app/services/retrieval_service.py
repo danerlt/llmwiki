@@ -4,7 +4,8 @@ import uuid
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, WikiPage
-from app.repositories import wiki_repo
+from app.repositories import search_miss_repo, wiki_repo
+from app.schemas.wiki import SearchHit
 from app.services.embedding_service import embedding_service
 from app.services.permission_service import permission_service
 
@@ -128,6 +129,42 @@ class RetrievalService:
                 pages.append(idx)
                 chosen.add(idx.id)
         return pages
+
+    async def search(
+        self,
+        session: AsyncSession,
+        user: User,
+        q: str,
+        kb: list[uuid.UUID] | None = None,
+        page_type: str | None = None,
+    ) -> list[SearchHit]:
+        """搜索：检索可见页 → 构造 SearchHit 摘要。无 page_type 过滤仍 0 结果时记录为无果词。"""
+        pages = [
+            p
+            for p in await self.retrieve(session, user, q, kb_scope=kb)
+            if p.page_type != "index"  # 目录页不进搜索结果
+            and (page_type is None or p.page_type == page_type)
+        ]
+        terms = _query_terms(q)
+        hits: list[SearchHit] = []
+        for p in pages:
+            snippet, matched = make_snippet(p.content_md or "", terms)
+            hits.append(
+                SearchHit(
+                    id=p.id,
+                    kb_id=p.kb_id,
+                    title=p.title,
+                    slug=p.slug,
+                    page_type=p.page_type,
+                    snippet=snippet,
+                    matched=matched,
+                )
+            )
+        # 知识空缺：无 page_type 过滤的普通搜索仍 0 结果 → 记录为无果词（过滤导致的空不算）
+        if not hits and page_type is None and q.strip():
+            await search_miss_repo.record(session, user_id=user.id, query=q.strip())
+            await session.commit()
+        return hits
 
 
 retrieval_service = RetrievalService()

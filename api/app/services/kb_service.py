@@ -2,11 +2,28 @@ import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import KnowledgeBase
+from app.models import KnowledgeBase, User
 from app.repositories import kb_repo, wiki_repo
+from app.schemas.kb import KBOut
+from app.services.permission_service import permission_service
 
 
 class KbService:
+    async def list_my_kbs(self, session: AsyncSession, user: User) -> list[KBOut]:
+        id_list = list(await permission_service.accessible_kb_ids(session, user))
+        kbs = await kb_repo.list_by_ids(session, id_list)
+        counts = await wiki_repo.counts_by_kbs(session, id_list)
+        return [
+            KBOut(
+                id=k.id,
+                scope_type=k.scope_type,
+                scope_ref_id=k.scope_ref_id,
+                name=k.name,
+                page_count=counts.get(k.id, 0),
+            )
+            for k in kbs
+        ]
+
     async def ensure_kb(
         self, session: AsyncSession, scope_type: str, scope_ref_id: uuid.UUID | None, name: str
     ) -> KnowledgeBase:

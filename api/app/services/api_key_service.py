@@ -1,10 +1,14 @@
 import hashlib
 import secrets
+import uuid
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.exceptions import NotFoundException
 from app.models import ApiKey, User
 from app.repositories import api_key_repo, user_repo
+from app.schemas.api_key import ApiKeyCreated, ApiKeyOut
+from app.services.audit_service import audit_service
 
 
 class ApiKeyService:
@@ -30,6 +34,48 @@ class ApiKeyService:
         if user is None or not user.is_active:
             return None
         return user
+
+    async def list_my_keys(self, session: AsyncSession, user: User) -> list[ApiKeyOut]:
+        """列出当前用户的全部 Key。"""
+        rows = await api_key_repo.list_by_user(session, user.id)
+        return [ApiKeyOut.model_validate(r) for r in rows]
+
+    async def create_key(self, session: AsyncSession, user: User, name: str) -> ApiKeyCreated:
+        """创建 Key 并记审计，返回含明文的创建结果（明文仅此一次可见）。"""
+        rec, raw = await self.issue(session, user_id=user.id, name=name)
+        await audit_service.record(
+            session,
+            actor_id=user.id,
+            action="apikey.create",
+            target_type="api_key",
+            target_id=rec.id,
+            detail={"name": name},
+        )
+        await session.commit()
+        return ApiKeyCreated(
+            id=rec.id,
+            name=rec.name,
+            prefix=rec.prefix,
+            revoked=rec.revoked,
+            created_at=rec.created_at,
+            last_used_at=rec.last_used_at,
+            key=raw,
+        )
+
+    async def revoke_key(self, session: AsyncSession, user: User, key_id: uuid.UUID) -> None:
+        """撤销当前用户的 Key 并记审计。Key 不存在或非本人所有时抛 NotFoundException。"""
+        rec = await api_key_repo.get_owned(session, key_id, user.id)
+        if rec is None:
+            raise NotFoundException("key not found")
+        rec.revoked = True
+        await audit_service.record(
+            session,
+            actor_id=user.id,
+            action="apikey.revoke",
+            target_type="api_key",
+            target_id=key_id,
+        )
+        await session.commit()
 
 
 api_key_service = ApiKeyService()
