@@ -38,6 +38,8 @@ class WikiPage(Base):
     frontmatter: Mapped[dict] = mapped_column(JSON, default=dict)
     source_ids: Mapped[list] = mapped_column(JSON, default=list)
     tags: Mapped[list] = mapped_column(JSON, default=list)
+    # 语义检索向量（归一化 float 列表；未启用 embeddings 时为 None）。JSON 兼容 SQLite/PG。
+    embedding: Mapped[list | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()

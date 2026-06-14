@@ -46,4 +46,4 @@ def cosine(a: list[float], b: list[float]) -> float:
     """两个归一化向量的余弦相似度（即点积）。"""
     if not a or not b or len(a) != len(b):
         return 0.0
-    return sum(x * y for x, y in zip(a, b))
+    return sum(x * y for x, y in zip(a, b, strict=False))

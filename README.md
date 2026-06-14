@@ -11,7 +11,7 @@ curl localhost:8000/api/health   # -> {"status":"ok"}
 
 ## 后端测试
 ```bash
-cd api && pip install -r requirements.txt && pytest -q
+cd api && uv sync && uv run pytest -q   # 依赖由 pyproject.toml + uv.lock 管理
 ```
 
 ## 架构

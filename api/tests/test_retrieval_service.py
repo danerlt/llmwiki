@@ -99,3 +99,24 @@ async def test_retrieve_handles_natural_language_question(session):
     # 整句以前按子串召不回；现在按词(python / 后端)召回
     pages = await retrieval_service.retrieve(session, admin, "Python后端有哪些")
     assert any(p.slug == "后端服务" for p in pages)
+
+
+async def test_retrieve_includes_vector_matches(session, monkeypatch):
+    """启用向量后，关键词不命中但语义相近的页也应被召回。"""
+    from app.services import embedding_service
+
+    monkeypatch.setattr(embedding_service, "embed", lambda text: [1.0, 0.0])  # 查询固定向量
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="ve@x.com", password="pw123456", display_name="A", role="admin"
+    )
+    await session.flush()
+    p = await wiki_repo.upsert(
+        session, kb_id=kb.id, slug="sem", title="毫不相关的标题", page_type="concept",
+        content_md="zzz", frontmatter={}, source_ids=[],
+    )
+    p.embedding = [1.0, 0.0]  # 与查询向量同向 → 余弦=1
+    await session.flush()
+    pages = await retrieval_service.retrieve(session, admin, "完全不沾边的查询")
+    assert any(pp.slug == "sem" for pp in pages)  # 语义命中（关键词不命中）

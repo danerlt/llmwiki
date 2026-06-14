@@ -5,7 +5,9 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, WikiPage
 from app.repositories import wiki_repo
-from app.services import permission_service
+from app.services import embedding_service, permission_service
+
+_VECTOR_FLOOR = 0.25  # 余弦低于此值视为无关，不纳入
 
 _ASCII_RE = re.compile(r"[A-Za-z0-9]+")
 _CJK_RE = re.compile(r"[一-鿿]+")
@@ -81,6 +83,19 @@ async def retrieve(
                 entry[1] += 1
         seeds = [pair[0] for pair in sorted(scored.values(), key=lambda x: -x[1])][:limit]
     result: dict[uuid.UUID, WikiPage] = {p.id: p for p in seeds}
+
+    # 向量召回（启用时）：查询取向量，与可见页向量做余弦，补充关键词盲区的语义相关页。
+    # 关闭/未装依赖时 embed() 返回 None，此段跳过，行为与纯关键词检索一致。
+    qvec = embedding_service.embed(q)
+    if qvec is not None:
+        scored_vec: list[tuple[float, WikiPage]] = []
+        for p in await wiki_repo.list_by_kbs(session, kb_id_list):
+            if p.page_type != "index" and p.embedding:
+                scored_vec.append((embedding_service.cosine(qvec, p.embedding), p))
+        scored_vec.sort(key=lambda x: -x[0])
+        for score, p in scored_vec[:limit]:
+            if score >= _VECTOR_FLOOR:
+                result.setdefault(p.id, p)
 
     # 图扩展 1：page_links 直接链接（高信号，已回填 to_page_id）
     for p in await wiki_repo.linked_pages(session, list(result.keys())):

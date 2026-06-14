@@ -185,6 +185,12 @@ async def list_by_kbs(session: AsyncSession, kb_ids: list[uuid.UUID]) -> list[Wi
     return list(res.scalars().all())
 
 
+async def all_content_pages(session: AsyncSession) -> list[WikiPage]:
+    """所有非 index 内容页（用于 embedding 重建）。"""
+    res = await session.execute(select(WikiPage).where(WikiPage.page_type != "index"))
+    return list(res.scalars().all())
+
+
 async def counts_by_kbs(
     session: AsyncSession, kb_ids: list[uuid.UUID]
 ) -> dict[uuid.UUID, int]:

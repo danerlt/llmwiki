@@ -8,7 +8,8 @@
 - 后端测试：`cd api && uv run pytest`          # pyproject: testpaths=["tests"], asyncio_mode=auto
 - 前端测试：`cd web && pnpm test`               # vitest run（注意：本项目用 pnpm@10，不是 npm）
 - 前端类型：`cd web && pnpm exec tsc --noEmit`  # tsc 即类型门禁
-- 后端 lint：（暂无 ruff/black/mypy，requirements.txt 未引入 —— 引入工具后再补此行，勿编造）
+- 后端 lint：`cd api && uv run ruff check .`      # 提交前必须全绿（pyproject: line-length=120, py312）
+- 后端类型：`cd api && uv run mypy app`            # 渐进式（宽松起步），暂非硬门禁
 
 ## 数据库变更（红线，不可违反）
 

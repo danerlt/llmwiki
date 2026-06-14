@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.ingest import parser, pipeline
 from app.integrations.storage import StorageBackend
 from app.repositories import source_repo, wiki_repo
-from app.services import kb_service
+from app.services import embedding_service, kb_service
 
 _logger = logging.getLogger("app.ingest")
 
@@ -111,6 +111,8 @@ async def ingest_source(
                 frontmatter={**d.frontmatter, "type": d.page_type, "sources": merged_sources},
                 source_ids=merged_sources,
             )
+            if embedding_service.enabled():  # 语义检索向量（关闭时跳过）
+                page.embedding = embedding_service.embed(f"{d.title}\n{d.content_md}")
             await session.flush()
             await wiki_repo.replace_links(
                 session, from_page_id=page.id, to_slugs=pipeline.extract_wikilinks(d.content_md)

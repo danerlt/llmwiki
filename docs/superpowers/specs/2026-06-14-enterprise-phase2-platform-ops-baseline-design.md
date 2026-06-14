@@ -78,6 +78,7 @@ FastAPI/Starlette 的 `add_middleware` 后加者在外层。实际装配顺序�
 `RateLimitMiddleware` 用 `dict[(ip, minute_window), count]` 做固定窗口计数。每次请求按 `int(time.time()) // 60` 算窗口,先清理非当前窗口键(避免无界增长),再自增计数,超 `rate_limit_per_min` 返回 429。
 
 - **默认关闭**:`rate_limit_per_min` 默认 0,`<=0` 直接放行——生产按需开启,避免本地/测试误触发。
+- **超限响应**:返回 `429` + `Retry-After: 60`,响应体为 `{"detail": "请求过于频繁，请稍后再试"}`。注意:此 detail 是**中文**面向终端用户的可读文案,而全局异常 handler 的 500 detail 是英文 `internal server error`(见 3.4 节)——前者属用户可直接看到的限流提示(故用中文),后者刻意保持泛化以不泄漏内部细节;两处语言风格不统一是有意取舍而非疏漏,后续若要统一文案需一并评估面向用户与面向运维的不同诉求。
 - **豁免**:`OPTIONS`(CORS 预检)与探针路径 `/api/health` `/api/readyz` `/api/metrics`(`_RL_EXEMPT`)不计入,保证健康检查与监控不被限流误杀。
 - **多实例局限**:进程内计数,多副本下各自独立。注释明确"多实例需换 Redis"。
 - 提供 `reset_rate_limit()` 供测试清空计数。
@@ -108,6 +109,8 @@ FastAPI/Starlette 的 `add_middleware` 后加者在外层。实际装配顺序�
 - 退避:第 `attempt` 次失败后 `sleep(backoff_base * 2**attempt)`(指数退避);
 - 成功响应解析 `usage.total_tokens` 调 `metrics.observe_llm()` 记 token;流式 `stream()` 无 usage 回传,仅记调用次数(`observe_llm(0)`)。
 - `transport` 参数支持注入 `httpx.MockTransport`,便于在测试中模拟 5xx/4xx(依赖注入而非打桩)。
+- **重试仅覆盖 `complete()`**:上述退避重试循环只包裹非流式 `complete()`;流式 `stream()` 直接打开连接并 `raise_for_status()`,**不走 `max_retries` 包裹**——上游瞬时错误(超时/429/5xx)不会自动重试,失败中途即抛出由调用方收尾(SSE 已开始逐块下发,中途重试会破坏增量语义)。即流式与非流式的健壮化语义不同,使用流式接口的上游需自行处理瞬时失败。
+- **提示注入防护**:`_messages()` 拼装历史时会过滤掉非 `user`/`assistant` 角色的消息(`integrations/llm.py` 第 44–46 行,仅保留 `role in ("user","assistant")` 且 `content` 为非空字符串者),防止历史中夹带的 `system`/其它角色被注入到提示中改写指令(由 `test_llm_messages_includes_history_and_filters_bad_roles` 覆盖)。
 
 ## 4. 数据模型变更
 
@@ -133,7 +136,7 @@ FastAPI/Starlette 的 `add_middleware` 后加者在外层。实际装配顺序�
 |---|---|---|---|
 | GET | `/api/health` | 公开 | 存活探针,恒返回 `{"status":"ok"}` |
 | GET | `/api/readyz` | 公开 | 就绪探针,探 DB/Redis/MinIO,任一不通 503,返回 `{"ready":bool,"checks":{db,redis,minio}}` |
-| GET | `/api/metrics` | 公开 | Prometheus 文本(`text/plain; version=0.0.4`) |
+| GET | `/api/metrics` | 公开 | Prometheus 文本(`text/plain; version=0.0.4; charset=utf-8`) |
 | GET | `/api/audit` | **admin**(`require_admin`) | 分页审计列表,`Paginated[AuditEventOut]`,查询参 `limit`(1–200,默认 50)/`offset`(≥0)/`action`(精确过滤) |
 | GET | `/api/audit/export` | **admin** | 审计 CSV 导出(合规留证),可按 `action` 过滤,`attachment; filename=audit_log.csv` |
 
@@ -152,6 +155,7 @@ FastAPI/Starlette 的 `add_middleware` 后加者在外层。实际装配顺序�
 - **CORS 凭据**:`allow_credentials=True` + 显式来源白名单(`cors_origin_list`,留空回退 `[app_url]`),`expose_headers=["X-Request-ID"]` 使前端可读取追踪 id。
 - **限流**:开启后按 IP 阻断暴力/爬取,探针豁免避免误伤监控。
 - **请求可追踪**:request_id 贯穿响应头 + 每条日志 + 错误体,支持端到端排障与合规取证关联。
+- **LLM 历史角色过滤(防提示注入)**:`LLMClient._messages()` 拼装对话历史时只接纳 `user`/`assistant` 角色且内容为非空字符串的消息,丢弃 `system` 及任何其它角色——防止持久化历史里夹带的恶意/异常角色被回灌进提示、篡改系统指令。系统提示恒由本端在数组首位注入,历史不得越权改写(`test_llm_messages_includes_history_and_filters_bad_roles` 验证)。
 
 ## 7. 配置项
 

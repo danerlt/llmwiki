@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import require_admin
 from app.db.session import get_db
 from app.repositories import feedback_repo, wiki_repo
+from app.services import embedding_service
 
 router = APIRouter(tags=["analytics"], dependencies=[Depends(require_admin)])
 
@@ -37,3 +38,18 @@ async def analytics(
         "orphan_pages": [_page_brief(p) for p in orphan],
         "review_due_pages": [_page_brief(p) for p in review_due],
     }
+
+
+@router.post("/admin/embeddings/reindex")
+async def reindex_embeddings(session: AsyncSession = Depends(get_db)) -> dict:
+    """为所有内容页重建语义向量（admin）。embeddings 未启用时为空操作。"""
+    if not embedding_service.enabled():
+        return {"enabled": False, "reindexed": 0}
+    n = 0
+    for p in await wiki_repo.all_content_pages(session):
+        vec = embedding_service.embed(f"{p.title}\n{p.content_md or ''}")
+        if vec is not None:
+            p.embedding = vec
+            n += 1
+    await session.commit()
+    return {"enabled": True, "reindexed": n}
