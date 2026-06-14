@@ -1,8 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import ForbiddenException, NotFoundException
+from app.common.response import Response
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import User
@@ -21,10 +24,10 @@ router = APIRouter(tags=["comments"])
 async def _readable_page(session: AsyncSession, page_id: uuid.UUID, user: User):
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+        raise NotFoundException("page not found")
     accessible = await permission_service.accessible_kb_ids(session, user)
     if page.kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     return page
 
 
@@ -35,7 +38,8 @@ def _out(c, name: str) -> CommentOut:
     )
 
 
-@router.get("/pages/{page_id}/comments", response_model=list[CommentOut])
+@router.get("/pages/{page_id}/comments", response_model=Response[list[CommentOut]])
+@api_response
 async def list_comments(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -49,7 +53,8 @@ async def list_comments(
     return out
 
 
-@router.post("/pages/{page_id}/comments", response_model=CommentOut, status_code=status.HTTP_201_CREATED)
+@router.post("/pages/{page_id}/comments", response_model=Response[CommentOut], status_code=status.HTTP_201_CREATED)
+@api_response
 async def add_comment(
     page_id: uuid.UUID,
     body: CommentCreate,
@@ -75,6 +80,7 @@ async def add_comment(
 
 
 @router.delete("/comments/{comment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@api_response
 async def delete_comment(
     comment_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -82,10 +88,10 @@ async def delete_comment(
 ):
     c = await comment_repo.get_by_id(session, comment_id)
     if c is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="comment not found")
+        raise NotFoundException("comment not found")
     # 仅作者本人或管理员可删
     if c.author_id != user.id and user.role != "admin":
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="not allowed")
+        raise ForbiddenException("not allowed")
     await comment_repo.delete(session, comment_id)
     await audit_service.record(
         session, actor_id=user.id, action="comment.delete", target_type="comment", target_id=comment_id

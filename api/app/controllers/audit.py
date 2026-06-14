@@ -6,6 +6,8 @@ from fastapi import APIRouter, Depends, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.response import Response
 from app.core.deps import require_admin
 from app.db.session import get_db
 from app.repositories import user_repo
@@ -16,7 +18,8 @@ from app.services import audit_service
 router = APIRouter(tags=["audit"], dependencies=[Depends(require_admin)])
 
 
-@router.get("/audit", response_model=Paginated[AuditEventOut])
+@router.get("/audit", response_model=Response[Paginated[AuditEventOut]])
+@api_response
 async def list_audit(
     limit: int = Query(50, ge=1, le=200),
     offset: int = Query(0, ge=0),

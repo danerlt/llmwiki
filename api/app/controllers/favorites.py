@@ -1,8 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import ForbiddenException, NotFoundException
+from app.common.response import Response
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import User
@@ -16,14 +19,15 @@ router = APIRouter(tags=["favorites"])
 async def _readable_page(session: AsyncSession, page_id: uuid.UUID, user: User):
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+        raise NotFoundException("page not found")
     accessible = await permission_service.accessible_kb_ids(session, user)
     if page.kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     return page
 
 
-@router.get("/favorites", response_model=list[PageOut])
+@router.get("/favorites", response_model=Response[list[PageOut]])
+@api_response
 async def my_favorites(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
@@ -34,6 +38,7 @@ async def my_favorites(
 
 
 @router.post("/pages/{page_id}/favorite", status_code=status.HTTP_204_NO_CONTENT)
+@api_response
 async def add_favorite(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -45,6 +50,7 @@ async def add_favorite(
 
 
 @router.delete("/pages/{page_id}/favorite", status_code=status.HTTP_204_NO_CONTENT)
+@api_response
 async def remove_favorite(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),

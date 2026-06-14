@@ -31,7 +31,7 @@ async def test_analytics_orphan_stale_and_feedback(session, client):
     try:
         r = await client.get("/api/analytics?stale_days=3650")
         assert r.status_code == 200
-        body = r.json()
+        body = r.json()["data"]
         assert body["feedback"]["up"] == 1
         orphan_titles = [p["title"] for p in body["orphan_pages"]]
         assert "孤儿页" in orphan_titles and "A" not in orphan_titles  # 互链页不是孤儿
@@ -58,7 +58,7 @@ async def test_analytics_review_due_lists_stale_verified(session, client):
     app.dependency_overrides[get_current_user] = lambda: admin
     try:
         r = await client.get("/api/analytics?stale_days=30")
-        ids = [p["id"] for p in r.json()["review_due_pages"]]
+        ids = [p["id"] for p in r.json()["data"]["review_due_pages"]]
         assert str(page.id) in ids  # 认证超期 → 待复审
     finally:
         app.dependency_overrides.pop(get_current_user, None)

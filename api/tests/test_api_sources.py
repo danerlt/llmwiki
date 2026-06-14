@@ -38,7 +38,7 @@ async def test_upload_creates_pending_source(session, client):
             files={"file": ("a.md", b"# hi", "text/markdown")},
         )
         assert r.status_code == 200
-        body = r.json()
+        body = r.json()["data"]
         assert body["status"] == "pending"
         sid = body["source_id"]
         assert enqueued == [sid]
@@ -105,7 +105,7 @@ async def test_list_sources_returns_kb_sources(session, client):
     try:
         r = await client.get(f"/api/kbs/{kb.id}/sources")
         assert r.status_code == 200
-        items = r.json()
+        items = r.json()["data"]
         assert len(items) == 1 and items[0]["filename"] == "a.md"
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -131,7 +131,7 @@ async def test_reingest_resets_status_and_enqueues(session, client):
     try:
         r = await client.post(f"/api/sources/{src.id}/reingest")
         assert r.status_code == 200
-        body = r.json()
+        body = r.json()["data"]
         assert body["status"] == "pending" and body["error"] is None
         assert enqueued == [str(src.id)]
         refreshed = await source_repo.get_by_id(session, src.id)

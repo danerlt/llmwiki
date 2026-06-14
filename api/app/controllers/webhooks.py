@@ -1,8 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import NotFoundException
+from app.common.response import Response
 from app.core.deps import require_admin
 from app.db.session import get_db
 from app.models import User
@@ -13,12 +16,14 @@ from app.services import audit_service
 router = APIRouter(tags=["webhooks"], dependencies=[Depends(require_admin)])
 
 
-@router.get("/webhooks", response_model=list[WebhookOut])
+@router.get("/webhooks", response_model=Response[list[WebhookOut]])
+@api_response
 async def list_webhooks(session: AsyncSession = Depends(get_db)):
     return await webhook_repo.list_all(session)
 
 
-@router.post("/webhooks", response_model=WebhookOut, status_code=status.HTTP_201_CREATED)
+@router.post("/webhooks", response_model=Response[WebhookOut], status_code=status.HTTP_201_CREATED)
+@api_response
 async def create_webhook(
     body: WebhookCreate,
     actor: User = Depends(require_admin),
@@ -34,6 +39,7 @@ async def create_webhook(
 
 
 @router.delete("/webhooks/{webhook_id}", status_code=status.HTTP_204_NO_CONTENT)
+@api_response
 async def delete_webhook(
     webhook_id: uuid.UUID,
     actor: User = Depends(require_admin),
@@ -41,7 +47,7 @@ async def delete_webhook(
 ):
     w = await webhook_repo.get_by_id(session, webhook_id)
     if w is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="webhook not found")
+        raise NotFoundException("webhook not found")
     await session.delete(w)
     await audit_service.record(
         session, actor_id=actor.id, action="webhook.delete", target_type="webhook",

@@ -24,15 +24,15 @@ async def test_add_list_delete_comment(session, client):
     try:
         r = await client.post(f"/api/pages/{page.id}/comments", json={"body": "第一条评论"})
         assert r.status_code == 201
-        cid = r.json()["id"]
-        assert r.json()["author_name"] == "Admin"
+        cid = r.json()["data"]["id"]
+        assert r.json()["data"]["author_name"] == "Admin"
 
         lst = await client.get(f"/api/pages/{page.id}/comments")
-        assert lst.status_code == 200 and len(lst.json()) == 1
+        assert lst.status_code == 200 and len(lst.json()["data"]) == 1
 
         d = await client.delete(f"/api/comments/{cid}")
         assert d.status_code == 204
-        assert (await client.get(f"/api/pages/{page.id}/comments")).json() == []
+        assert (await client.get(f"/api/pages/{page.id}/comments")).json()["data"] == []
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -71,7 +71,7 @@ async def test_non_author_cannot_delete_comment(session, client):
     await session.commit()
     app.dependency_overrides[get_current_user] = lambda: admin
     try:
-        cid = (await client.post(f"/api/pages/{page.id}/comments", json={"body": "hi"})).json()["id"]
+        cid = (await client.post(f"/api/pages/{page.id}/comments", json={"body": "hi"})).json()["data"]["id"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
     app.dependency_overrides[get_current_user] = lambda: other

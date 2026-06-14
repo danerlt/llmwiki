@@ -18,7 +18,7 @@ async def test_kb_listing_filtered_by_permission(client, session):
     await session.commit()
 
     r = await client.post("/api/auth/login", json={"email": "alice@x.com", "password": "pw123456"})
-    token = r.json()["access_token"]
+    token = r.json()["data"]["access_token"]
     r2 = await client.get("/api/kbs", headers={"Authorization": f"Bearer {token}"})
     body = r2.json()
     # 阶段3 灰度：/api/kbs 改走统一信封 Response[T]

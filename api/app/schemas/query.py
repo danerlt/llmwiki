@@ -31,3 +31,7 @@ class Citation(BaseModel):
 class AnswerOut(BaseModel):
     answer: str
     citations: list[Citation]
+
+
+class FeedbackResult(BaseModel):
+    ok: bool = True

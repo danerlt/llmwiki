@@ -27,8 +27,8 @@ async def test_subscribe_then_edit_notifies_watcher(session, client):
     app.dependency_overrides[get_current_user] = lambda: bob
     try:
         assert (await client.post(f"/api/pages/{page.id}/subscribe")).status_code == 204
-        assert (await client.get(f"/api/pages/{page.id}")).json()["is_subscribed"] is True
-        assert (await client.get("/api/notifications/unread-count")).json()["count"] == 0
+        assert (await client.get(f"/api/pages/{page.id}")).json()["data"]["is_subscribed"] is True
+        assert (await client.get("/api/notifications/unread-count")).json()["data"]["count"] == 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -42,12 +42,12 @@ async def test_subscribe_then_edit_notifies_watcher(session, client):
     # bob 收到通知
     app.dependency_overrides[get_current_user] = lambda: bob
     try:
-        assert (await client.get("/api/notifications/unread-count")).json()["count"] == 1
-        notes = (await client.get("/api/notifications")).json()
+        assert (await client.get("/api/notifications/unread-count")).json()["data"]["count"] == 1
+        notes = (await client.get("/api/notifications")).json()["data"]
         assert len(notes) == 1 and notes[0]["type"] == "page.updated"
         # 标记全部已读
         assert (await client.post("/api/notifications/read")).status_code == 204
-        assert (await client.get("/api/notifications/unread-count")).json()["count"] == 0
+        assert (await client.get("/api/notifications/unread-count")).json()["data"]["count"] == 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -59,6 +59,6 @@ async def test_actor_not_notified_of_own_edit(session, client):
     try:
         await client.post(f"/api/pages/{page.id}/subscribe")
         await client.put(f"/api/pages/{page.id}", json={"content_md": "自己改"})
-        assert (await client.get("/api/notifications/unread-count")).json()["count"] == 0
+        assert (await client.get("/api/notifications/unread-count")).json()["data"]["count"] == 0
     finally:
         app.dependency_overrides.pop(get_current_user, None)

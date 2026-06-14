@@ -17,7 +17,7 @@ async def test_stats_and_kb_page_count(session, client):
     try:
         r = await client.get("/api/stats")
         assert r.status_code == 200
-        body = r.json()
+        body = r.json()["data"]
         assert body["page_count"] >= 1 and body["kb_count"] >= 1
         kbs = await client.get("/api/kbs")
         assert any(k["page_count"] >= 1 for k in kbs.json()["data"])  # /kbs 信封内 data, 带页数

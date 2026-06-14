@@ -1,60 +1,28 @@
-from datetime import datetime, timedelta, timezone
-
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.response import Response
 from app.core.deps import require_admin
 from app.db.session import get_db
-from app.repositories import feedback_repo, search_miss_repo, wiki_repo
-from app.services import embedding_service
+from app.schemas.analytics import AnalyticsOut, ReindexResult
+from app.services import analytics_service
 
 router = APIRouter(tags=["analytics"], dependencies=[Depends(require_admin)])
 
 
-def _page_brief(p) -> dict:
-    return {
-        "id": str(p.id),
-        "kb_id": str(p.kb_id),
-        "title": p.title,
-        "updated_at": p.updated_at.isoformat() if p.updated_at else None,
-    }
-
-
-@router.get("/analytics")
+@router.get("/analytics", response_model=Response[AnalyticsOut])
+@api_response
 async def analytics(
     stale_days: int = Query(90, ge=1, le=3650),
     session: AsyncSession = Depends(get_db),
-) -> dict:
-    """管理员分析：问答满意度 + 内容健康（陈旧页 / 孤儿页）。"""
-    before = datetime.now(timezone.utc) - timedelta(days=stale_days)
-    fb = await feedback_repo.counts(session)
-    stale = await wiki_repo.stale_pages(session, before, limit=50)
-    orphan = await wiki_repo.orphan_pages(session, limit=50)
-    review_due = await wiki_repo.review_due_pages(session, before, limit=50)
-    misses = await search_miss_repo.top(session, limit=50)
-    return {
-        "feedback": {"up": fb.get("up", 0), "down": fb.get("down", 0)},
-        "stale_days": stale_days,
-        "stale_pages": [_page_brief(p) for p in stale],
-        "orphan_pages": [_page_brief(p) for p in orphan],
-        "review_due_pages": [_page_brief(p) for p in review_due],
-        "search_misses": [
-            {"query": q, "count": c, "last_seen": ls.isoformat() if ls else None}
-            for q, c, ls in misses
-        ],
-    }
+):
+    """管理员分析：问答满意度 + 内容健康（陈旧页/孤儿页/待复审）+ 知识空缺。"""
+    return await analytics_service.overview(session, stale_days)
 
 
-@router.post("/admin/embeddings/reindex")
-async def reindex_embeddings(session: AsyncSession = Depends(get_db)) -> dict:
+@router.post("/admin/embeddings/reindex", response_model=Response[ReindexResult])
+@api_response
+async def reindex_embeddings(session: AsyncSession = Depends(get_db)):
     """为所有内容页重建语义向量（admin）。embeddings 未启用时为空操作。"""
-    if not embedding_service.enabled():
-        return {"enabled": False, "reindexed": 0}
-    n = 0
-    for p in await wiki_repo.all_content_pages(session):
-        vec = embedding_service.embed(f"{p.title}\n{p.content_md or ''}")
-        if vec is not None:
-            p.embedding = vec
-            n += 1
-    await session.commit()
-    return {"enabled": True, "reindexed": n}
+    return await analytics_service.reindex_embeddings(session)

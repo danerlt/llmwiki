@@ -34,7 +34,7 @@ async def test_search_filters_inaccessible(session, client):
     try:
         r = await client.get("/api/search", params={"q": "后端"})
         assert r.status_code == 200
-        kb_ids = {p["kb_id"] for p in r.json()}
+        kb_ids = {p["kb_id"] for p in r.json()["data"]}
         assert str(frontend_kb.id) not in kb_ids   # 平级前端组不可见——铁律
         assert str(backend_kb.id) in kb_ids
     finally:
@@ -59,10 +59,10 @@ async def test_search_filters_by_page_type(session, client):
     try:
         # backend_kb 的页是 entity 类型
         ent = await client.get("/api/search", params={"q": "后端", "page_type": "entity"})
-        assert ent.status_code == 200 and len(ent.json()) >= 1
+        assert ent.status_code == 200 and len(ent.json()["data"]) >= 1
         # 过滤为 overview → 无结果
         ov = await client.get("/api/search", params={"q": "后端", "page_type": "overview"})
-        assert ov.json() == []
+        assert ov.json()["data"] == []
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -132,7 +132,7 @@ async def test_query_returns_answer_and_citations(session, client):
         # MVP 关键词召回为子串匹配，传关键词“后端”
         r = await client.post("/api/query", json={"question": "后端"})
         assert r.status_code == 200
-        body = r.json()
+        body = r.json()["data"]
         assert "[1]" in body["answer"]
         cited_kbs = {c["kb_id"] for c in body["citations"]}
         assert str(frontend_kb.id) not in cited_kbs   # 引用只来自可见 KB

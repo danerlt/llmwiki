@@ -3,9 +3,17 @@ from datetime import datetime, timezone
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from fastapi.responses import Response
+from fastapi.responses import Response as RawResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import (
+    ConflictException,
+    ForbiddenException,
+    NotFoundException,
+    ParamsException,
+)
+from app.common.response import Response
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.ingest import parser, pipeline
@@ -92,10 +100,10 @@ async def _writable_page(session: AsyncSession, page_id: uuid.UUID, user: User):
     """取页并校验当前用户对其所在 KB 有写权限，否则 404/403。"""
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+        raise NotFoundException("page not found")
     kb = await kb_repo.get_by_id(session, page.kb_id)
     if kb is None or not await permission_service.can_write(session, user, kb):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no write permission")
+        raise ForbiddenException("no write permission")
     return page
 
 
@@ -111,7 +119,8 @@ async def _post_write_rebuild(
     await wiki_repo.backfill_link_targets(session, kb_id=page.kb_id)
 
 
-@router.get("/kbs/{kb_id}/pages", response_model=list[PageOut])
+@router.get("/kbs/{kb_id}/pages", response_model=Response[list[PageOut]])
+@api_response
 async def list_pages(
     kb_id: uuid.UUID,
     tag: str | None = Query(None, description="按标签过滤"),
@@ -120,14 +129,19 @@ async def list_pages(
 ):
     accessible = await permission_service.accessible_kb_ids(session, user)
     if kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     pages = await wiki_repo.list_by_kb(session, kb_id)
     if tag:
         pages = [p for p in pages if tag in (p.tags or [])]
     return pages
 
 
-@router.post("/kbs/{kb_id}/pages", response_model=PageDetailOut, status_code=status.HTTP_201_CREATED)
+@router.post(
+    "/kbs/{kb_id}/pages",
+    response_model=Response[PageDetailOut],
+    status_code=status.HTTP_201_CREATED,
+)
+@api_response
 async def create_page(
     kb_id: uuid.UUID,
     body: PageCreate,
@@ -136,9 +150,9 @@ async def create_page(
 ):
     kb = await kb_repo.get_by_id(session, kb_id)
     if kb is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="kb not found")
+        raise NotFoundException("kb not found")
     if not await permission_service.can_write(session, user, kb):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no write permission")
+        raise ForbiddenException("no write permission")
     if body.page_type not in HUMAN_PAGE_TYPES:
         raise HTTPException(
             status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
@@ -148,7 +162,7 @@ async def create_page(
     if not slug:
         raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid slug")
     if await wiki_repo.get_by_slug(session, kb_id, slug) is not None:
-        raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="slug already exists")
+        raise ConflictException("slug already exists")
     page = await wiki_repo.upsert(
         session, kb_id=kb_id, slug=slug, title=body.title, page_type=body.page_type,
         content_md=body.content_md, frontmatter={"author": str(user.id)}, source_ids=[],
@@ -166,7 +180,8 @@ async def create_page(
     return await _build_detail(session, page, accessible)
 
 
-@router.put("/pages/{page_id}", response_model=PageDetailOut)
+@router.put("/pages/{page_id}", response_model=Response[PageDetailOut])
+@api_response
 async def update_page(
     page_id: uuid.UUID,
     body: PageUpdate,
@@ -208,6 +223,7 @@ async def update_page(
 
 
 @router.delete("/pages/{page_id}", status_code=status.HTTP_204_NO_CONTENT)
+@api_response
 async def delete_page(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -215,9 +231,7 @@ async def delete_page(
 ):
     page = await _writable_page(session, page_id, user)
     if page.page_type == "index":
-        raise HTTPException(
-            status_code=status.HTTP_400_BAD_REQUEST, detail="cannot delete the index page"
-        )
+        raise ParamsException("cannot delete the index page")
     kb_id = page.kb_id
     await wiki_repo.delete_page(session, page_id)
     await session.flush()
@@ -229,7 +243,8 @@ async def delete_page(
     await session.commit()
 
 
-@router.get("/pages/{page_id}/versions", response_model=list[PageVersionOut])
+@router.get("/pages/{page_id}/versions", response_model=Response[list[PageVersionOut]])
+@api_response
 async def list_page_versions(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -237,14 +252,15 @@ async def list_page_versions(
 ):
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+        raise NotFoundException("page not found")
     accessible = await permission_service.accessible_kb_ids(session, user)
     if page.kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     return await wiki_repo.list_versions(session, page_id)
 
 
-@router.post("/pages/{page_id}/revert/{version_no}", response_model=PageDetailOut)
+@router.post("/pages/{page_id}/revert/{version_no}", response_model=Response[PageDetailOut])
+@api_response
 async def revert_page(
     page_id: uuid.UUID,
     version_no: int,
@@ -254,7 +270,7 @@ async def revert_page(
     page = await _writable_page(session, page_id, user)
     target = await wiki_repo.get_version(session, page_id, version_no)
     if target is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="version not found")
+        raise NotFoundException("version not found")
     page.title = target.title
     page.content_md = target.content_md
     page.page_type = target.page_type
@@ -275,26 +291,27 @@ async def export_page_markdown(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
-) -> Response:
+) -> RawResponse:
     """导出页面为 Markdown 文件（含 frontmatter 标题）。需读权限。"""
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+        raise NotFoundException("page not found")
     accessible = await permission_service.accessible_kb_ids(session, user)
     if page.kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     body = f"# {page.title}\n\n{page.content_md or ''}\n"
     # 文件名可能含非 ASCII：ASCII 兜底 + RFC 5987 filename* 提供 UTF-8 原名
     ascii_name = page.slug.encode("ascii", "ignore").decode() or "page"
     disp = f"attachment; filename=\"{ascii_name}.md\"; filename*=UTF-8''{quote(page.slug)}.md"
-    return Response(
+    return RawResponse(
         content=body,
         media_type="text/markdown; charset=utf-8",
         headers={"Content-Disposition": disp},
     )
 
 
-@router.post("/pages/{page_id}/verify", response_model=PageDetailOut)
+@router.post("/pages/{page_id}/verify", response_model=Response[PageDetailOut])
+@api_response
 async def verify_page(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -313,7 +330,8 @@ async def verify_page(
     return await _build_detail(session, page, accessible)
 
 
-@router.delete("/pages/{page_id}/verify", response_model=PageDetailOut)
+@router.delete("/pages/{page_id}/verify", response_model=Response[PageDetailOut])
+@api_response
 async def unverify_page(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -331,7 +349,8 @@ async def unverify_page(
     return await _build_detail(session, page, accessible)
 
 
-@router.get("/recent-pages", response_model=list[PageOut])
+@router.get("/recent-pages", response_model=Response[list[PageOut]])
+@api_response
 async def recent_pages(
     user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)
 ):
@@ -339,7 +358,8 @@ async def recent_pages(
     return await wiki_repo.recent(session, list(ids), limit=8)
 
 
-@router.get("/pages/{page_id}", response_model=PageDetailOut)
+@router.get("/pages/{page_id}", response_model=Response[PageDetailOut])
+@api_response
 async def get_page(
     page_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -347,10 +367,10 @@ async def get_page(
 ):
     page = await wiki_repo.get_by_id(session, page_id)
     if page is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="page not found")
+        raise NotFoundException("page not found")
     accessible = await permission_service.accessible_kb_ids(session, user)
     if page.kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     fav = await favorite_repo.exists(session, user_id=user.id, page_id=page.id)
     sub = await subscription_repo.exists(session, user_id=user.id, page_id=page.id)
     return await _build_detail(session, page, accessible, is_favorited=fav, is_subscribed=sub)

@@ -20,8 +20,9 @@ async def test_activity_merges_updates_and_comments(session, client):
         await client.post(f"/api/pages/{page.id}/comments", json={"body": "评论一下"})
         r = await client.get("/api/activity")
         assert r.status_code == 200
-        types = [i["type"] for i in r.json()]
+        items = r.json()["data"]
+        types = [i["type"] for i in items]
         assert "page.commented" in types  # 评论进入活动流
-        assert any(i["page_id"] == str(page.id) for i in r.json())
+        assert any(i["page_id"] == str(page.id) for i in items)
     finally:
         app.dependency_overrides.pop(get_current_user, None)

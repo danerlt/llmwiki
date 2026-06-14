@@ -35,8 +35,8 @@ async def test_get_page_detail_accessible(session, client):
     try:
         r = await client.get(f"/api/pages/{page.id}")
         assert r.status_code == 200
-        assert r.json()["content_md"] == "内容"
-        assert r.json()["source_ids"] == ["s1"]
+        assert r.json()["data"]["content_md"] == "内容"
+        assert r.json()["data"]["source_ids"] == ["s1"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -61,25 +61,25 @@ async def test_create_edit_history_revert_flow(session, client):
             json={"title": "手写页", "content_md": "第一版 [[相关]]", "page_type": "concept"},
         )
         assert r.status_code == 201
-        pid = r.json()["id"]
-        assert r.json()["content_md"] == "第一版 [[相关]]"
+        pid = r.json()["data"]["id"]
+        assert r.json()["data"]["content_md"] == "第一版 [[相关]]"
 
         # 编辑
         r2 = await client.put(f"/api/pages/{pid}", json={"content_md": "第二版"})
-        assert r2.status_code == 200 and r2.json()["content_md"] == "第二版"
+        assert r2.status_code == 200 and r2.json()["data"]["content_md"] == "第二版"
 
         # 历史：两个版本（v2 在前）
         rv = await client.get(f"/api/pages/{pid}/versions")
         assert rv.status_code == 200
-        vers = rv.json()
+        vers = rv.json()["data"]
         assert [v["version_no"] for v in vers] == [2, 1]
         assert vers[1]["content_md"] == "第一版 [[相关]]"
 
         # 回滚到 v1 → 内容回到第一版，且新增 v3
         rr = await client.post(f"/api/pages/{pid}/revert/1")
-        assert rr.status_code == 200 and rr.json()["content_md"] == "第一版 [[相关]]"
+        assert rr.status_code == 200 and rr.json()["data"]["content_md"] == "第一版 [[相关]]"
         rv2 = await client.get(f"/api/pages/{pid}/versions")
-        assert [v["version_no"] for v in rv2.json()] == [3, 2, 1]
+        assert [v["version_no"] for v in rv2.json()["data"]] == [3, 2, 1]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -92,10 +92,10 @@ async def test_page_tags_create_and_filter(session, client):
             f"/api/kbs/{kb.id}/pages",
             json={"title": "带标签", "content_md": "x", "tags": ["后端", "python"]},
         )
-        assert r.status_code == 201 and set(r.json()["tags"]) == {"后端", "python"}
+        assert r.status_code == 201 and set(r.json()["data"]["tags"]) == {"后端", "python"}
         await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "无标签", "slug": "no-tag"})
         filtered = await client.get(f"/api/kbs/{kb.id}/pages?tag=python")
-        titles = [p["title"] for p in filtered.json()]
+        titles = [p["title"] for p in filtered.json()["data"]]
         assert "带标签" in titles and "无标签" not in titles
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -109,7 +109,7 @@ async def test_export_page_markdown(session, client):
             await client.post(
                 f"/api/kbs/{kb.id}/pages", json={"title": "导出页", "content_md": "正文内容"}
             )
-        ).json()["id"]
+        ).json()["data"]["id"]
         r = await client.get(f"/api/pages/{pid}/markdown")
         assert r.status_code == 200 and "text/markdown" in r.headers["content-type"]
         assert "# 导出页" in r.text and "正文内容" in r.text
@@ -121,12 +121,12 @@ async def test_page_verify_and_unverify(session, client):
     admin, kb = await _admin_company_kb(session)
     app.dependency_overrides[get_current_user] = lambda: admin
     try:
-        pid = (await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "权威页"})).json()["id"]
+        pid = (await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "权威页"})).json()["data"]["id"]
         v = await client.post(f"/api/pages/{pid}/verify")
-        assert v.status_code == 200 and v.json()["verified_at"] is not None
-        assert v.json()["verified_by_name"] == "Admin"
+        assert v.status_code == 200 and v.json()["data"]["verified_at"] is not None
+        assert v.json()["data"]["verified_by_name"] == "Admin"
         u = await client.delete(f"/api/pages/{pid}/verify")
-        assert u.status_code == 200 and u.json()["verified_at"] is None
+        assert u.status_code == 200 and u.json()["data"]["verified_at"] is None
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -175,7 +175,7 @@ async def test_delete_page(session, client):
     try:
         pid = (
             await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "待删", "slug": "del"})
-        ).json()["id"]
+        ).json()["data"]["id"]
         assert (await client.delete(f"/api/pages/{pid}")).status_code == 204
         assert (await client.get(f"/api/pages/{pid}")).status_code == 404
     finally:
@@ -189,7 +189,7 @@ async def test_delete_page_with_comment_succeeds(session, client):
     try:
         pid = (
             await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "有评论", "slug": "wc"})
-        ).json()["id"]
+        ).json()["data"]["id"]
         await client.post(f"/api/pages/{pid}/comments", json={"body": "一条评论"})
         assert (await client.delete(f"/api/pages/{pid}")).status_code == 204
     finally:
@@ -222,7 +222,7 @@ async def test_get_page_hides_cross_kb_source_filenames(session, client):
     try:
         r = await client.get(f"/api/pages/{page.id}")
         assert r.status_code == 200
-        assert r.json()["sources"] == []  # 跨库来源文件名不泄漏
+        assert r.json()["data"]["sources"] == []  # 跨库来源文件名不泄漏
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -246,7 +246,7 @@ async def test_get_page_includes_outlinks(session, client):
     try:
         r = await client.get(f"/api/pages/{a.id}")
         assert r.status_code == 200
-        outs = r.json()["outlinks"]
+        outs = r.json()["data"]["outlinks"]
         assert [o["slug"] for o in outs] == ["b"]  # 本页出链含已解析的 b
     finally:
         app.dependency_overrides.pop(get_current_user, None)

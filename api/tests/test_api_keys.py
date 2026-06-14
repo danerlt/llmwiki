@@ -12,15 +12,15 @@ async def test_api_key_create_use_revoke(session, client):
     try:
         created = await client.post("/api/api-keys", json={"name": "ci-bot"})
         assert created.status_code == 201
-        raw = created.json()["key"]
+        raw = created.json()["data"]["key"]
         assert raw.startswith("lk_")
-        kid = created.json()["id"]
+        kid = created.json()["data"]["id"]
     finally:
         app.dependency_overrides.pop(get_current_user, None)
 
     # 用 API Key（无 JWT override）访问受保护端点 → 以 owner 身份通过
     me = await client.get("/api/me", headers={"X-API-Key": raw})
-    assert me.status_code == 200 and me.json()["email"] == "admin@x.com"
+    assert me.status_code == 200 and me.json()["data"]["email"] == "admin@x.com"
 
     # 无效 key → 401
     assert (await client.get("/api/me", headers={"X-API-Key": "lk_bad_key"})).status_code == 401

@@ -30,9 +30,9 @@ async def test_webhook_crud_admin_only(session, client):
             "/api/webhooks", json={"url": "https://example.com/hook", "secret": "supersecret"}
         )
         assert r.status_code == 201
-        wid = r.json()["id"]
-        assert "secret" not in r.json()  # 不回显密钥
-        assert len((await client.get("/api/webhooks")).json()) == 1
+        wid = r.json()["data"]["id"]
+        assert "secret" not in r.json()["data"]  # 不回显密钥
+        assert len((await client.get("/api/webhooks")).json()["data"]) == 1
         assert (await client.delete(f"/api/webhooks/{wid}")).status_code == 204
     finally:
         app.dependency_overrides.pop(get_current_user, None)

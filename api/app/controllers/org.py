@@ -1,8 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import NotFoundException, ParamsException
+from app.common.response import Response
 from app.core.deps import require_admin
 from app.db.session import get_db
 from app.models import User
@@ -21,7 +24,8 @@ from app.services import audit_service, org_service
 router = APIRouter(tags=["org"], dependencies=[Depends(require_admin)])
 
 
-@router.post("/departments", response_model=DepartmentOut)
+@router.post("/departments", response_model=Response[DepartmentOut])
+@api_response
 async def create_department(
     body: DepartmentCreate,
     actor: User = Depends(require_admin),
@@ -34,12 +38,14 @@ async def create_department(
     return dept
 
 
-@router.get("/departments", response_model=list[DepartmentOut])
+@router.get("/departments", response_model=Response[list[DepartmentOut]])
+@api_response
 async def list_departments(session: AsyncSession = Depends(get_db)):
     return await org_repo.list_departments(session)
 
 
-@router.post("/teams", response_model=TeamOut)
+@router.post("/teams", response_model=Response[TeamOut])
+@api_response
 async def create_team(
     body: TeamCreate,
     actor: User = Depends(require_admin),
@@ -52,17 +58,20 @@ async def create_team(
     return team
 
 
-@router.get("/teams", response_model=list[TeamOut])
+@router.get("/teams", response_model=Response[list[TeamOut]])
+@api_response
 async def list_teams(session: AsyncSession = Depends(get_db)):
     return await org_repo.list_teams(session)
 
 
-@router.get("/users", response_model=list[UserOut])
+@router.get("/users", response_model=Response[list[UserOut]])
+@api_response
 async def list_users(session: AsyncSession = Depends(get_db)):
     return await user_repo.list_all(session)
 
 
 @router.post("/teams/{team_id}/members")
+@api_response
 async def add_member(
     team_id: uuid.UUID,
     body: TeamMemberAdd,
@@ -79,17 +88,18 @@ async def add_member(
     return {"status": "ok"}
 
 
-@router.post("/users/{user_id}/deactivate", response_model=UserOut)
+@router.post("/users/{user_id}/deactivate", response_model=Response[UserOut])
+@api_response
 async def deactivate_user(
     user_id: uuid.UUID,
     actor: User = Depends(require_admin),
     session: AsyncSession = Depends(get_db),
 ):
     if user_id == actor.id:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能停用自己")
+        raise ParamsException("不能停用自己")
     target = await user_repo.get_by_id(session, user_id)
     if target is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+        raise NotFoundException("user not found")
     await user_repo.set_active(session, user_id, False)
     await user_repo.bump_token_version(session, user_id)  # 立即切断其所有会话
     await audit_service.record(session, actor_id=actor.id, action="user.deactivate",
@@ -98,7 +108,8 @@ async def deactivate_user(
     return await user_repo.get_by_id(session, user_id)
 
 
-@router.post("/users/{user_id}/activate", response_model=UserOut)
+@router.post("/users/{user_id}/activate", response_model=Response[UserOut])
+@api_response
 async def activate_user(
     user_id: uuid.UUID,
     actor: User = Depends(require_admin),
@@ -106,7 +117,7 @@ async def activate_user(
 ):
     target = await user_repo.get_by_id(session, user_id)
     if target is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+        raise NotFoundException("user not found")
     await user_repo.set_active(session, user_id, True)
     await audit_service.record(session, actor_id=actor.id, action="user.activate",
                                target_type="user", target_id=user_id)
@@ -114,7 +125,8 @@ async def activate_user(
     return await user_repo.get_by_id(session, user_id)
 
 
-@router.post("/users", response_model=UserOut)
+@router.post("/users", response_model=Response[UserOut])
+@api_response
 async def create_user(
     body: UserCreate,
     actor: User = Depends(require_admin),

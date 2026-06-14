@@ -5,6 +5,9 @@ from collections.abc import AsyncIterator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
+from app.repositories import feedback_repo
+from app.schemas.query import FeedbackRequest, FeedbackResult
+from app.services.audit_service import audit_service
 from app.services.retrieval_service import retrieval_service
 
 _WIKILINK = re.compile(r"\[\[([^\]]+)\]\]")
@@ -85,6 +88,23 @@ class QueryService:
             return
         answer_text = _WIKILINK.sub(r"\1", "".join(acc))
         yield _sse({"done": True, "citations": _filter_citations(answer_text, citations)})
+
+    async def record_feedback(
+        self, session: AsyncSession, user: User, body: FeedbackRequest
+    ) -> FeedbackResult:
+        """记录问答答案反馈（赞/踩），用于度量与迭代 AI 质量。"""
+        await feedback_repo.create(
+            session, user_id=user.id, question=body.question, answer=body.answer, vote=body.vote
+        )
+        await audit_service.record(
+            session,
+            actor_id=user.id,
+            action="answer.feedback",
+            target_type="query",
+            detail={"vote": body.vote},
+        )
+        await session.commit()
+        return FeedbackResult(ok=True)
 
 
 query_service = QueryService()

@@ -1,8 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import ForbiddenException, NotFoundException
+from app.common.response import Response
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import PromotionRequest, User
@@ -28,7 +31,8 @@ async def _to_out(session: AsyncSession, pr: PromotionRequest) -> PromotionOut:
     )
 
 
-@router.post("/pages/{page_id}/promote", response_model=PromotionOut)
+@router.post("/pages/{page_id}/promote", response_model=Response[PromotionOut])
+@api_response
 async def promote(
     page_id: uuid.UUID,
     body: PromotionCreate,
@@ -44,14 +48,15 @@ async def promote(
             target_type="page", target_id=page_id, detail={"to_kb_id": str(body.to_kb_id)},
         )
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenException(str(e))
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise NotFoundException(str(e))
     await session.commit()
     return await _to_out(session, pr)
 
 
-@router.get("/reviews", response_model=list[PromotionOut])
+@router.get("/reviews", response_model=Response[list[PromotionOut]])
+@api_response
 async def list_reviews(
     user: User = Depends(get_current_user), session: AsyncSession = Depends(get_db)
 ):
@@ -59,7 +64,8 @@ async def list_reviews(
     return [await _to_out(session, pr) for pr in prs]
 
 
-@router.post("/reviews/{pr_id}/approve", response_model=PromotionOut)
+@router.post("/reviews/{pr_id}/approve", response_model=Response[PromotionOut])
+@api_response
 async def approve(
     pr_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -72,14 +78,15 @@ async def approve(
             target_type="promotion", target_id=pr_id,
         )
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenException(str(e))
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise NotFoundException(str(e))
     await session.commit()
     return await _to_out(session, pr)
 
 
-@router.post("/reviews/{pr_id}/reject", response_model=PromotionOut)
+@router.post("/reviews/{pr_id}/reject", response_model=Response[PromotionOut])
+@api_response
 async def reject(
     pr_id: uuid.UUID,
     body: ReviewDecision,
@@ -93,8 +100,8 @@ async def reject(
             target_type="promotion", target_id=pr_id,
         )
     except PermissionError as e:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=str(e))
+        raise ForbiddenException(str(e))
     except LookupError as e:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=str(e))
+        raise NotFoundException(str(e))
     await session.commit()
     return await _to_out(session, pr)

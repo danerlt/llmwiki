@@ -9,11 +9,11 @@ async def test_login_and_me(client, session):
 
     r = await client.post("/api/auth/login", json={"email": "admin@x.com", "password": "pw123456"})
     assert r.status_code == 200
-    token = r.json()["access_token"]
+    token = r.json()["data"]["access_token"]
 
     r2 = await client.get("/api/me", headers={"Authorization": f"Bearer {token}"})
     assert r2.status_code == 200
-    assert r2.json()["email"] == "admin@x.com"
+    assert r2.json()["data"]["email"] == "admin@x.com"
 
 
 async def test_logout_revokes_existing_token(client, session):
@@ -21,7 +21,7 @@ async def test_logout_revokes_existing_token(client, session):
     await session.commit()
     token = (
         await client.post("/api/auth/login", json={"email": "u@x.com", "password": "pw123456"})
-    ).json()["access_token"]
+    ).json()["data"]["access_token"]
     auth = {"Authorization": f"Bearer {token}"}
     assert (await client.get("/api/me", headers=auth)).status_code == 200
     # 登出自增 token_version → 旧令牌立即失效
@@ -33,12 +33,12 @@ async def test_refresh_token_issues_new_access(client, session):
     await org_service.create_user(session, email="r@x.com", password="pw123456", display_name="R")
     await session.commit()
     login = await client.post("/api/auth/login", json={"email": "r@x.com", "password": "pw123456"})
-    refresh_tok = login.json()["refresh_token"]
+    refresh_tok = login.json()["data"]["refresh_token"]
     assert refresh_tok
     # 用 refresh 换新 access
     r = await client.post("/api/auth/refresh", json={"refresh_token": refresh_tok})
     assert r.status_code == 200
-    new_access = r.json()["access_token"]
+    new_access = r.json()["data"]["access_token"]
     assert (
         await client.get("/api/me", headers={"Authorization": f"Bearer {new_access}"})
     ).status_code == 200
@@ -52,7 +52,7 @@ async def test_change_password_rotates_sessions(client, session):
     await session.commit()
     old = (
         await client.post("/api/auth/login", json={"email": "u@x.com", "password": "pw123456"})
-    ).json()["access_token"]
+    ).json()["data"]["access_token"]
     oldh = {"Authorization": f"Bearer {old}"}
     # 错误旧密码 → 400
     bad = await client.post(
@@ -68,7 +68,7 @@ async def test_change_password_rotates_sessions(client, session):
         headers=oldh,
     )
     assert ok.status_code == 200
-    newtok = ok.json()["access_token"]
+    newtok = ok.json()["data"]["access_token"]
     # 旧令牌失效，新令牌可用
     assert (await client.get("/api/me", headers=oldh)).status_code == 401
     assert (

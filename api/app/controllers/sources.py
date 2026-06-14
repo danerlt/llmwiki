@@ -3,6 +3,13 @@ import uuid
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import (
+    ForbiddenException,
+    NotFoundException,
+    ParamsException,
+)
+from app.common.response import Response
 from app.core.config import settings
 from app.core.deps import get_current_user
 from app.db.session import get_db
@@ -43,7 +50,8 @@ def get_storage() -> StorageBackend:
     )
 
 
-@router.post("/kbs/{kb_id}/sources", response_model=SourceCreatedOut)
+@router.post("/kbs/{kb_id}/sources", response_model=Response[SourceCreatedOut])
+@api_response
 async def upload_source(
     kb_id: uuid.UUID,
     file: UploadFile,
@@ -53,9 +61,9 @@ async def upload_source(
 ):
     kb = await kb_repo.get_by_id(session, kb_id)
     if kb is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="kb not found")
+        raise NotFoundException("kb not found")
     if not await permission_service.can_write(session, user, kb):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no write permission")
+        raise ForbiddenException("no write permission")
 
     filename = file.filename or "upload.bin"
     if not any(filename.lower().endswith(ext) for ext in _ALLOWED_EXTS):
@@ -73,7 +81,7 @@ async def upload_source(
             )
     data = bytes(buf)
     if not data:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="empty file")
+        raise ParamsException("empty file")
     src = await source_repo.create(
         session,
         kb_id=kb_id,
@@ -97,7 +105,8 @@ async def upload_source(
     return SourceCreatedOut(source_id=src.id, status="pending")
 
 
-@router.get("/kbs/{kb_id}/sources", response_model=list[SourceOut])
+@router.get("/kbs/{kb_id}/sources", response_model=Response[list[SourceOut]])
+@api_response
 async def list_sources(
     kb_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -105,11 +114,12 @@ async def list_sources(
 ):
     accessible = await permission_service.accessible_kb_ids(session, user)
     if kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     return await source_repo.list_by_kb(session, kb_id)
 
 
-@router.get("/sources/{source_id}", response_model=SourceOut)
+@router.get("/sources/{source_id}", response_model=Response[SourceOut])
+@api_response
 async def get_source(
     source_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -117,14 +127,15 @@ async def get_source(
 ):
     src = await source_repo.get_by_id(session, source_id)
     if src is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
+        raise NotFoundException("source not found")
     accessible = await permission_service.accessible_kb_ids(session, user)
     if src.kb_id not in accessible:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
+        raise ForbiddenException("no access")
     return src
 
 
-@router.post("/sources/{source_id}/reingest", response_model=SourceOut)
+@router.post("/sources/{source_id}/reingest", response_model=Response[SourceOut])
+@api_response
 async def reingest_source(
     source_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -132,10 +143,10 @@ async def reingest_source(
 ):
     src = await source_repo.get_by_id(session, source_id)
     if src is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="source not found")
+        raise NotFoundException("source not found")
     kb = await kb_repo.get_by_id(session, src.kb_id)
     if kb is None or not await permission_service.can_write(session, user, kb):
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no write permission")
+        raise ForbiddenException("no write permission")
     # 复位状态再入队：失败/已完成的源都可重新摄入一遍
     await source_repo.set_status(session, source_id, "pending", error=None)
     await audit_service.record(

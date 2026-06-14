@@ -24,16 +24,16 @@ async def test_favorite_toggle_and_list(session, client):
     try:
         assert (await client.post(f"/api/pages/{page.id}/favorite")).status_code == 204
         # 详情显示已收藏
-        assert (await client.get(f"/api/pages/{page.id}")).json()["is_favorited"] is True
+        assert (await client.get(f"/api/pages/{page.id}")).json()["data"]["is_favorited"] is True
         # 我的收藏含该页
         favs = await client.get("/api/favorites")
-        assert any(p["id"] == str(page.id) for p in favs.json())
+        assert any(p["id"] == str(page.id) for p in favs.json()["data"])
         # 重复收藏幂等
         assert (await client.post(f"/api/pages/{page.id}/favorite")).status_code == 204
-        assert len((await client.get("/api/favorites")).json()) == 1
+        assert len((await client.get("/api/favorites")).json()["data"]) == 1
         # 取消收藏
         assert (await client.delete(f"/api/pages/{page.id}/favorite")).status_code == 204
-        assert (await client.get("/api/favorites")).json() == []
-        assert (await client.get(f"/api/pages/{page.id}")).json()["is_favorited"] is False
+        assert (await client.get("/api/favorites")).json()["data"] == []
+        assert (await client.get(f"/api/pages/{page.id}")).json()["data"]["is_favorited"] is False
     finally:
         app.dependency_overrides.pop(get_current_user, None)

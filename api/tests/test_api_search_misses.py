@@ -29,7 +29,7 @@ async def test_zero_result_search_records_miss(session, client):
     app.dependency_overrides[get_current_user] = lambda: user
     try:
         r = await client.get("/api/search", params={"q": "区块链"})
-        assert r.status_code == 200 and r.json() == []  # 无果
+        assert r.status_code == 200 and r.json()["data"] == []  # 无果
         queries = {q for q, _c, _ls in await search_miss_repo.top(session)}
         assert "区块链" in queries  # 无果词被记录为知识空缺
     finally:
@@ -43,7 +43,7 @@ async def test_hit_search_records_no_miss(session, client):
     app.dependency_overrides[get_current_user] = lambda: user
     try:
         r = await client.get("/api/search", params={"q": "Python"})
-        assert r.status_code == 200 and len(r.json()) >= 1  # 命中
+        assert r.status_code == 200 and len(r.json()["data"]) >= 1  # 命中
         assert await search_miss_repo.top(session) == []  # 命中不记无果
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -57,7 +57,7 @@ async def test_page_type_filtered_empty_not_recorded(session, client):
     try:
         # 带 page_type 过滤导致的空结果不是知识空缺，不记录
         r = await client.get("/api/search", params={"q": "Python", "page_type": "overview"})
-        assert r.status_code == 200 and r.json() == []
+        assert r.status_code == 200 and r.json()["data"] == []
         assert await search_miss_repo.top(session) == []
     finally:
         app.dependency_overrides.pop(get_current_user, None)
@@ -81,7 +81,7 @@ async def test_misses_aggregated_and_exposed_in_analytics(session, client):
     try:
         r = await client.get("/api/analytics")
         assert r.status_code == 200
-        misses = {m["query"]: m["count"] for m in r.json()["search_misses"]}
+        misses = {m["query"]: m["count"] for m in r.json()["data"]["search_misses"]}
         assert misses.get("区块链") == 2  # 按词聚合计数
         assert misses.get("量子计算") == 1
     finally:

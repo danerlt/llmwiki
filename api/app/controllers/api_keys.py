@@ -1,8 +1,11 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.common.api_response import api_response
+from app.common.exceptions import NotFoundException
+from app.common.response import Response
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import User
@@ -13,7 +16,8 @@ from app.services import api_key_service, audit_service
 router = APIRouter(tags=["api-keys"])
 
 
-@router.get("/api-keys", response_model=list[ApiKeyOut])
+@router.get("/api-keys", response_model=Response[list[ApiKeyOut]])
+@api_response
 async def list_keys(
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
@@ -21,7 +25,8 @@ async def list_keys(
     return await api_key_repo.list_by_user(session, user.id)
 
 
-@router.post("/api-keys", response_model=ApiKeyCreated, status_code=status.HTTP_201_CREATED)
+@router.post("/api-keys", response_model=Response[ApiKeyCreated], status_code=status.HTTP_201_CREATED)
+@api_response
 async def create_key(
     body: ApiKeyCreate,
     user: User = Depends(get_current_user),
@@ -40,6 +45,7 @@ async def create_key(
 
 
 @router.delete("/api-keys/{key_id}", status_code=status.HTTP_204_NO_CONTENT)
+@api_response
 async def revoke_key(
     key_id: uuid.UUID,
     user: User = Depends(get_current_user),
@@ -47,7 +53,7 @@ async def revoke_key(
 ):
     rec = await api_key_repo.get_owned(session, key_id, user.id)
     if rec is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="key not found")
+        raise NotFoundException("key not found")
     rec.revoked = True
     await audit_service.record(
         session, actor_id=user.id, action="apikey.revoke", target_type="api_key", target_id=key_id

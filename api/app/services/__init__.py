@@ -1,6 +1,8 @@
 # package
 # 所有 service 已迁移为"类 + 单例"。在此重导出单例实例，
 # 使 `from app.services import X` 拿到单例（调用点写法不变）。
+from app.services.activity_service import activity_service
+from app.services.analytics_service import analytics_service
 from app.services.api_key_service import api_key_service
 from app.services.audit_service import audit_service
 from app.services.auth_service import auth_service
@@ -16,6 +18,8 @@ from app.services.retrieval_service import retrieval_service
 from app.services.webhook_service import webhook_service
 
 __all__ = [
+    "activity_service",
+    "analytics_service",
     "api_key_service",
     "audit_service",
     "auth_service",
