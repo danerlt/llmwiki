@@ -2,6 +2,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import {
   ArrowRight,
   ArrowUpRight,
+  Bell,
   ChevronRight,
   FileText,
   Files,
@@ -51,6 +52,7 @@ export default function PageDetailPage() {
   const [target, setTarget] = useState("");
   const [promoteMsg, setPromoteMsg] = useState("");
   const [fav, setFav] = useState(false);
+  const [sub, setSub] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -62,6 +64,7 @@ export default function PageDetailPage() {
         if (cancelled) return;
         setPage(p);
         setFav(!!p.is_favorited);
+        setSub(!!p.is_subscribed);
         const sibs = await apiFetch<PageOut[]>(`/kbs/${p.kb_id}/pages`);
         if (cancelled) return;
         setSiblings(sibs);
@@ -96,6 +99,17 @@ export default function PageDetailPage() {
       else await del(`/pages/${pageId}/favorite`);
     } catch {
       setFav(!next); // 失败回滚
+    }
+  }
+
+  async function toggleSub() {
+    const next = !sub;
+    setSub(next);
+    try {
+      if (next) await postJson(`/pages/${pageId}/subscribe`, {});
+      else await del(`/pages/${pageId}/subscribe`);
+    } catch {
+      setSub(!next);
     }
   }
 
@@ -139,6 +153,13 @@ export default function PageDetailPage() {
               title={fav ? "取消收藏" : "收藏"}
             >
               <Star className={`h-4 w-4 ${fav ? "fill-amber-400" : ""}`} /> {fav ? "已收藏" : "收藏"}
+            </button>
+            <button
+              onClick={toggleSub}
+              className={`btn-ghost ${sub ? "text-accent-dark" : ""}`}
+              title={sub ? "取消关注" : "关注此页更新"}
+            >
+              <Bell className={`h-4 w-4 ${sub ? "fill-accent/30" : ""}`} /> {sub ? "已关注" : "关注"}
             </button>
             <Link to={`/pages/${page.id}/edit`} className="btn-ghost">
               <Pencil className="h-4 w-4" /> 编辑

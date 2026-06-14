@@ -8,6 +8,7 @@ import AuditPage from "./pages/AuditPage";
 import KbListPage from "./pages/KbListPage";
 import KbPagesPage from "./pages/KbPagesPage";
 import LoginPage from "./pages/LoginPage";
+import NotificationsPage from "./pages/NotificationsPage";
 import PageDetailPage from "./pages/PageDetailPage";
 import PageEditPage from "./pages/PageEditPage";
 import PageHistoryPage from "./pages/PageHistoryPage";
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/pages/:pageId/history" element={<PageHistoryPage />} />
             <Route path="/search" element={<SearchPage />} />
             <Route path="/query" element={<QueryPage />} />
+            <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/admin" element={<AdminPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/audit" element={<AuditPage />} />

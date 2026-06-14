@@ -49,6 +49,7 @@ export interface PageDetail extends PageOut {
   source_ids: string[];
   updated_at?: string | null;
   is_favorited?: boolean;
+  is_subscribed?: boolean;
   backlinks?: PageOut[];
   outlinks?: PageOut[];
   sources?: SourceRef[];
@@ -61,6 +62,15 @@ export interface SourceOut {
   status: string;
   error: string | null;
   job_id: string | null;
+}
+export interface NotificationItem {
+  id: string;
+  type: string;
+  page_id: string | null;
+  actor_id: string | null;
+  message: string;
+  read: boolean;
+  created_at: string;
 }
 export interface Comment {
   id: string;

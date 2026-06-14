@@ -1,6 +1,7 @@
-import type { ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import {
+  Bell,
   Inbox,
   LayoutDashboard,
   LogOut,
@@ -11,9 +12,20 @@ import {
 } from "lucide-react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 
+import { apiFetch } from "../api/client";
 import { useAuth } from "../auth/AuthContext";
 
-function NavItem({ to, icon, label }: { to: string; icon: ReactNode; label: string }) {
+function NavItem({
+  to,
+  icon,
+  label,
+  badge,
+}: {
+  to: string;
+  icon: ReactNode;
+  label: string;
+  badge?: number;
+}) {
   return (
     <NavLink
       to={to}
@@ -27,7 +39,12 @@ function NavItem({ to, icon, label }: { to: string; icon: ReactNode; label: stri
       }
     >
       <span className="grid h-[18px] w-[18px] place-items-center">{icon}</span>
-      {label}
+      <span className="flex-1">{label}</span>
+      {badge ? (
+        <span className="grid h-5 min-w-5 place-items-center rounded-full bg-accent px-1.5 text-xs font-semibold text-white">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      ) : null}
     </NavLink>
   );
 }
@@ -36,6 +53,17 @@ export default function Layout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const isAdmin = user?.role === "admin";
+  const [unread, setUnread] = useState(0);
+
+  useEffect(() => {
+    const tick = () =>
+      apiFetch<{ count: number }>("/notifications/unread-count")
+        .then((r) => setUnread(r.count))
+        .catch(() => {});
+    void tick();
+    const id = window.setInterval(tick, 30000);
+    return () => window.clearInterval(id);
+  }, []);
   return (
     <div className="flex min-h-screen">
       <aside className="sticky top-0 flex h-screen w-64 shrink-0 flex-col border-r border-line bg-card/70 px-4 py-5 backdrop-blur-sm">
@@ -58,6 +86,12 @@ export default function Layout() {
           <NavItem to="/" icon={<LayoutDashboard className="h-[18px] w-[18px]" />} label="概览" />
           <NavItem to="/search" icon={<Search className="h-[18px] w-[18px]" />} label="搜索" />
           <NavItem to="/query" icon={<Sparkles className="h-[18px] w-[18px]" />} label="智能问答" />
+          <NavItem
+            to="/notifications"
+            icon={<Bell className="h-[18px] w-[18px]" />}
+            label="通知"
+            badge={unread}
+          />
           <NavItem to="/reviews" icon={<Inbox className="h-[18px] w-[18px]" />} label="审核队列" />
           {isAdmin && (
             <>
