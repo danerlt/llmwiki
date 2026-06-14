@@ -14,9 +14,16 @@ router = APIRouter(tags=["auth"])
 
 @router.post("/auth/login", response_model=TokenResponse)
 async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> TokenResponse:
+    if auth_service.is_locked(body.email):
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="登录失败次数过多，请稍后再试",
+        )
     user = await auth_service.authenticate(session, body.email, body.password)
     if user is None:
+        auth_service.record_failure(body.email)
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="bad credentials")
+    auth_service.clear_failures(body.email)
     return TokenResponse(
         access_token=create_access_token(str(user.id), token_version=user.token_version)
     )

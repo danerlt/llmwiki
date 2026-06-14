@@ -62,6 +62,21 @@ async def test_change_password_rotates_sessions(client, session):
     ).status_code == 200
 
 
+async def test_login_lockout_after_repeated_failures(client, session):
+    from app.services import auth_service
+
+    auth_service.reset_lockout()
+    await org_service.create_user(session, email="lock@x.com", password="pw123456", display_name="L")
+    await session.commit()
+    for _ in range(5):
+        r = await client.post("/api/auth/login", json={"email": "lock@x.com", "password": "badpass"})
+        assert r.status_code == 401
+    # 触发锁定后即便密码正确也 429
+    blocked = await client.post("/api/auth/login", json={"email": "lock@x.com", "password": "pw123456"})
+    assert blocked.status_code == 429
+    auth_service.reset_lockout()
+
+
 async def test_login_bad_password(client, session):
     await org_service.create_user(session, email="u@x.com", password="right1", display_name="U")
     await session.commit()
