@@ -1,11 +1,32 @@
-from fastapi import APIRouter, Response, status
+from fastapi import APIRouter, Depends, Response, status
 from sqlalchemy import text
 
+from app.common.api_response import api_response
+from app.common.response import Response as ApiResponse
 from app.core import metrics
 from app.core.config import settings
-from app.db.session import SessionLocal
+from app.core.deps import require_admin
+from app.db.session import SessionLocal, engine
+from app.schemas.health import PoolStats
 
 router = APIRouter(tags=["health"])
+
+
+@router.get(
+    "/admin/db-pool",
+    response_model=ApiResponse[PoolStats],
+    dependencies=[Depends(require_admin)],
+)
+@api_response
+async def db_pool_stats() -> PoolStats:
+    """连接池监控（admin）：池大小 / 已签回 / 已签出 / 溢出，排查连接泄漏或打满。"""
+    pool = engine.sync_engine.pool
+    return PoolStats(
+        size=pool.size(),
+        checked_in=pool.checkedin(),
+        checked_out=pool.checkedout(),
+        overflow=pool.overflow(),
+    )
 
 
 @router.get("/health")

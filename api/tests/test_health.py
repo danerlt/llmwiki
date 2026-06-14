@@ -39,8 +39,19 @@ async def test_access_log_emitted_with_method_and_path(caplog):
     transport = ASGITransport(app=app)
     with caplog.at_level(logging.INFO, logger="app.access"):
         async with AsyncClient(transport=transport, base_url="http://test") as ac:
-            await ac.get("/api/health")
-    assert any("GET" in r.message and "/api/health" in r.message for r in caplog.records)
+            await ac.get("/api/kbs")  # 非探针路径会被访问日志记录
+    assert any("GET" in r.message and "/api/kbs" in r.message for r in caplog.records)
+
+
+@pytest.mark.asyncio
+async def test_probe_paths_not_access_logged(caplog):
+    import logging
+
+    transport = ASGITransport(app=app)
+    with caplog.at_level(logging.INFO, logger="app.access"):
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            await ac.get("/api/health")  # 探针被过滤，不进访问日志
+    assert not any("/api/health" in r.message for r in caplog.records)
 
 
 @pytest.mark.asyncio
@@ -92,6 +103,25 @@ async def test_readyz_503_when_dep_down(monkeypatch):
     assert resp.status_code == 503
     assert resp.json()["ready"] is False
     assert resp.json()["checks"]["redis"] is False
+
+
+@pytest.mark.asyncio
+async def test_db_pool_stats_admin_returns_fields(client, session):
+    from app.core.deps import get_current_user
+    from app.services import org_service
+
+    admin = await org_service.create_user(
+        session, email="pooladmin@x.com", password="pw123456", display_name="A", role="admin"
+    )
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        r = await client.get("/api/admin/db-pool")
+        assert r.status_code == 200
+        data = r.json()["data"]
+        assert {"size", "checked_in", "checked_out", "overflow"} <= data.keys()
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
 
 
 async def _true() -> bool:

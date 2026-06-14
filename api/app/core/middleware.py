@@ -74,9 +74,20 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         finally:
             request_id_ctx.reset(token)
         dur_ms = (time.perf_counter() - start) * 1000
-        _access_logger.info(
-            "%s %s -> %s %.1fms", request.method, request.url.path, response.status_code, dur_ms
-        )
+        # 探针(health/readyz/metrics)高频且无业务价值，从访问日志过滤以减噪（仍计入 metrics）
+        if request.url.path not in _RL_EXEMPT:
+            _access_logger.info(
+                "%s %s -> %s %.1fms", request.method, request.url.path, response.status_code, dur_ms
+            )
+        if response.status_code >= 400:  # 4xx/5xx 结构化错误日志，便于线上聚合排查
+            _access_logger.warning(
+                "请求失败 method=%s path=%s status=%s rid=%s %.1fms",
+                request.method,
+                request.url.path,
+                response.status_code,
+                rid,
+                dur_ms,
+            )
         if dur_ms > _SLOW_REQUEST_MS:
             _access_logger.warning(
                 "慢请求 %s %s 耗时 %.1fms (>%dms)",

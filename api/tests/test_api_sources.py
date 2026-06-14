@@ -18,7 +18,7 @@ async def _setup_user_kb(session, role="admin"):
     return user, kb
 
 
-async def test_upload_creates_pending_source(session, client):
+async def test_upload_creates_pending_source(session, client, monkeypatch):
     user, kb = await _setup_user_kb(session)
     await session.commit()
 
@@ -32,7 +32,7 @@ async def test_upload_creates_pending_source(session, client):
         enqueued.append(source_id)
         return "job-xyz"
 
-    queue_mod.enqueue_ingest = _fake_enqueue  # monkeypatch 入队
+    monkeypatch.setattr(queue_mod, "enqueue_ingest", _fake_enqueue)  # 自动还原, 防泄漏
     try:
         r = await client.post(
             f"/api/kbs/{kb.id}/sources",
@@ -52,17 +52,16 @@ async def test_upload_creates_pending_source(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
-async def test_upload_enqueue_failure_marks_source_failed(session, client):
+async def test_upload_enqueue_failure_marks_source_failed(session, client, monkeypatch):
     user, kb = await _setup_user_kb(session)
     await session.commit()
     app.dependency_overrides[sources_ctrl.get_storage] = lambda: FakeStorage()
     app.dependency_overrides[get_current_user] = lambda: user
-    orig = queue_mod.enqueue_ingest
 
     async def _boom(source_id: str) -> str:
         raise RuntimeError("redis down")
 
-    queue_mod.enqueue_ingest = _boom
+    monkeypatch.setattr(queue_mod, "enqueue_ingest", _boom)
     try:
         r = await client.post(
             f"/api/kbs/{kb.id}/sources",
@@ -73,7 +72,6 @@ async def test_upload_enqueue_failure_marks_source_failed(session, client):
         srcs = await source_repo.list_by_kb(session, kb.id)
         assert len(srcs) == 1 and srcs[0].status == "failed"
     finally:
-        queue_mod.enqueue_ingest = orig
         app.dependency_overrides.pop(sources_ctrl.get_storage, None)
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -112,7 +110,7 @@ async def test_list_sources_returns_kb_sources(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
-async def test_reingest_resets_status_and_enqueues(session, client):
+async def test_reingest_resets_status_and_enqueues(session, client, monkeypatch):
     user, kb = await _setup_user_kb(session)
     src = await source_repo.create(
         session, kb_id=kb.id, uploader_id=user.id, filename="a.md",
@@ -127,7 +125,7 @@ async def test_reingest_resets_status_and_enqueues(session, client):
         enqueued.append(source_id)
         return "job-re"
 
-    queue_mod.enqueue_ingest = _fake_enqueue
+    monkeypatch.setattr(queue_mod, "enqueue_ingest", _fake_enqueue)
     app.dependency_overrides[get_current_user] = lambda: user
     try:
         r = await client.post(f"/api/sources/{src.id}/reingest")
