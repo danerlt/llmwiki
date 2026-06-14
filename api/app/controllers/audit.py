@@ -1,4 +1,9 @@
+import csv
+import io
+import json
+
 from fastapi import APIRouter, Depends, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_admin
@@ -36,3 +41,31 @@ async def list_audit(
             )
         )
     return Paginated(items=items, total=total, limit=limit, offset=offset)
+
+
+@router.get("/audit/export")
+async def export_audit(
+    action: str | None = Query(None),
+    session: AsyncSession = Depends(get_db),
+) -> StreamingResponse:
+    """导出审计日志为 CSV（合规留证）。"""
+    events = await audit_service.list_recent(session, limit=10000, offset=0, action=action)
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["created_at", "actor_email", "action", "target_type", "target_id", "detail"])
+    for ev in events:
+        actor = await user_repo.get_by_id(session, ev.actor_id)
+        writer.writerow([
+            ev.created_at.isoformat() if ev.created_at else "",
+            actor.email if actor else "(未知)",
+            ev.action,
+            ev.target_type or "",
+            str(ev.target_id) if ev.target_id else "",
+            json.dumps(ev.detail, ensure_ascii=False) if ev.detail else "",
+        ])
+    buf.seek(0)
+    return StreamingResponse(
+        iter([buf.getvalue()]),
+        media_type="text/csv; charset=utf-8",
+        headers={"Content-Disposition": "attachment; filename=audit_log.csv"},
+    )

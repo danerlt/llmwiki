@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollText } from "lucide-react";
+import { Download, ScrollText } from "lucide-react";
 
-import { apiFetch } from "../api/client";
+import { apiFetch, getToken } from "../api/client";
 import type { AuditEventOut, Paginated } from "../api/types";
 import { EmptyState, PageHeader, Spinner } from "../components/ui";
 
@@ -23,6 +23,20 @@ export default function AuditPage() {
     load(0).catch(() => setErr("加载审计日志失败（需要 admin 权限）"));
   }, [load]);
 
+  async function exportCsv() {
+    const res = await fetch("/api/audit/export", {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) return;
+    const blob = await res.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "audit_log.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function more() {
     setLoadingMore(true);
     try {
@@ -37,7 +51,14 @@ export default function AuditPage() {
       <PageHeader
         title="审计日志"
         subtitle="关键动作的不可变留痕（谁 · 何时 · 做了什么）"
-        action={total > 0 ? <span className="text-sm text-ink-muted">共 {total} 条</span> : undefined}
+        action={
+          <div className="flex items-center gap-3">
+            {total > 0 && <span className="text-sm text-ink-muted">共 {total} 条</span>}
+            <button onClick={exportCsv} className="btn-ghost">
+              <Download className="h-4 w-4" /> 导出 CSV
+            </button>
+          </div>
+        }
       />
       {err && <p className="text-red-600">{err}</p>}
       {!events && !err ? (

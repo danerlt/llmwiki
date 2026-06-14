@@ -46,6 +46,21 @@ async def test_audit_pagination_and_filter(client, session):
     assert all(e["action"] == "user.create" for e in r2.json()["items"])
 
 
+async def test_audit_csv_export(client, session):
+    token = await _token(client, session, "admin")
+    h = {"Authorization": f"Bearer {token}"}
+    await client.post(
+        "/api/users",
+        json={"email": "x@x.com", "password": "pw123456", "display_name": "X"},
+        headers=h,
+    )
+    r = await client.get("/api/audit/export", headers=h)
+    assert r.status_code == 200
+    assert "text/csv" in r.headers["content-type"]
+    assert "created_at,actor_email,action" in r.text
+    assert "user.create" in r.text
+
+
 async def test_non_admin_cannot_view_audit(client, session):
     token = await _token(client, session, "user")
     r = await client.get("/api/audit", headers={"Authorization": f"Bearer {token}"})
