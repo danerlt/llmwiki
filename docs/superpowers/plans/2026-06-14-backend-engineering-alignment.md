@@ -37,7 +37,7 @@
 4. 改 `api/Dockerfile`：分层（系统依赖 → `uv sync --frozen --no-dev` → COPY 代码）。
 5. 改 `.github/workflows/ci.yml` 后端 job：用 `astral-sh/setup-uv` + `uv sync` + `uv run pytest`，并加 `uv run ruff check`。
 6. 跑一遍 ruff，修明显问题（未用 import 等），不一次性强推全部规则。
-**状态**：未开始
+**状态**：✅ 已完成（uv+pyproject+uv.lock、ruff/mypy 配置、.python-version/.dockerignore、Dockerfile/CI 迁 uv；ruff 全绿、pytest 全量绿、docker build 绿）
 
 ## 阶段 2：测试基座（真实 PostgreSQL 容器 + 隔离）
 
@@ -50,7 +50,7 @@
 3. `api/tests/fakes.py` 补 `FakeRedis`（fakeredis）fixture。
 4. 处理此前 SQLite-only 的 skip 标记，转真实 PG 执行。
 5. CI（阶段 1 已迁 uv）加 `services: postgres` + 跑 PG 集成测试。
-**状态**：未开始
+**状态**：✅ 已完成（conftest 切真实 PG + savepoint 隔离 via join_transaction_mode=create_savepoint；docker-compose.test.yml 端口 15433/16380 tmpfs；会话级 alembic 迁移链建 schema；test_infra_real_pg 红线；CI 加 postgres/redis service。全量 159 passed。注：当前无测试依赖 Redis，故未加 fakeredis fixture，留待需要时补）
 
 ## 阶段 3：统一响应与异常基础设施
 
