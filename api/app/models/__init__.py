@@ -9,6 +9,7 @@ from app.models.notification import Notification
 from app.models.page_link import PageLink
 from app.models.page_version import PageVersion
 from app.models.promotion_request import PromotionRequest
+from app.models.search_miss import SearchMiss
 from app.models.source import Source
 from app.models.subscription import Subscription
 from app.models.team import Team, UserTeam
@@ -28,6 +29,7 @@ __all__ = [
     "PageLink",
     "PageVersion",
     "PromotionRequest",
+    "SearchMiss",
     "Source",
     "Subscription",
     "Team",

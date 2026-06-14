@@ -6,6 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.models import User
+from app.repositories import search_miss_repo
 from app.schemas.wiki import SearchHit
 from app.services import retrieval_service
 from app.services.retrieval_service import _query_terms, make_snippet
@@ -42,4 +43,8 @@ async def search(
                 matched=matched,
             )
         )
+    # 知识空缺：无 page_type 过滤的普通搜索仍 0 结果 → 记录为无果词（过滤导致的空不算）
+    if not hits and page_type is None and q.strip():
+        await search_miss_repo.record(session, user_id=user.id, query=q.strip())
+        await session.commit()
     return hits

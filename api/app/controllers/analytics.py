@@ -5,7 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_admin
 from app.db.session import get_db
-from app.repositories import feedback_repo, wiki_repo
+from app.repositories import feedback_repo, search_miss_repo, wiki_repo
 from app.services import embedding_service
 
 router = APIRouter(tags=["analytics"], dependencies=[Depends(require_admin)])
@@ -31,12 +31,17 @@ async def analytics(
     stale = await wiki_repo.stale_pages(session, before, limit=50)
     orphan = await wiki_repo.orphan_pages(session, limit=50)
     review_due = await wiki_repo.review_due_pages(session, before, limit=50)
+    misses = await search_miss_repo.top(session, limit=50)
     return {
         "feedback": {"up": fb.get("up", 0), "down": fb.get("down", 0)},
         "stale_days": stale_days,
         "stale_pages": [_page_brief(p) for p in stale],
         "orphan_pages": [_page_brief(p) for p in orphan],
         "review_due_pages": [_page_brief(p) for p in review_due],
+        "search_misses": [
+            {"query": q, "count": c, "last_seen": ls.isoformat() if ls else None}
+            for q, c, ls in misses
+        ],
     }
 
 
