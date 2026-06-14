@@ -5,7 +5,7 @@ from app.core.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.models import User
-from app.repositories import user_repo
+from app.repositories import api_key_repo, comment_repo, favorite_repo, user_repo
 from app.schemas.auth import ChangePasswordRequest, LoginRequest, TokenResponse, UserOut
 from app.services import auth_service
 
@@ -59,3 +59,28 @@ async def change_password(
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)) -> User:
     return user
+
+
+@router.get("/me/export")
+async def export_my_data(
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+) -> dict:
+    """GDPR 数据主体请求（DSAR）：导出当前用户的个人数据。"""
+    comments = await comment_repo.list_by_author(session, user.id)
+    favorites = await favorite_repo.list_pages(session, user.id)
+    keys = await api_key_repo.list_by_user(session, user.id)
+    return {
+        "profile": {
+            "id": str(user.id),
+            "email": user.email,
+            "display_name": user.display_name,
+            "role": user.role,
+        },
+        "comments": [
+            {"page_id": str(c.page_id), "body": c.body, "created_at": c.created_at.isoformat()}
+            for c in comments
+        ],
+        "favorites": [{"page_id": str(p.id), "title": p.title} for p in favorites],
+        "api_keys": [{"name": k.name, "prefix": k.prefix, "revoked": k.revoked} for k in keys],
+    }

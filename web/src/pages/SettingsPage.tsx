@@ -1,7 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { KeyRound, Plug, Trash2 } from "lucide-react";
+import { Download, KeyRound, Plug, Trash2 } from "lucide-react";
 
-import { apiFetch, del, postJson, setToken } from "../api/client";
+import { apiFetch, del, getToken, postJson, setToken } from "../api/client";
 import type { ApiKey } from "../api/types";
 import { useAuth } from "../auth/AuthContext";
 import { PageHeader } from "../components/ui";
@@ -100,6 +100,22 @@ export default function SettingsPage() {
   const [err, setErr] = useState("");
   const [saving, setSaving] = useState(false);
 
+  async function exportData() {
+    const res = await fetch("/api/me/export", {
+      headers: { Authorization: `Bearer ${getToken()}` },
+    });
+    if (!res.ok) return;
+    const blob = new Blob([JSON.stringify(await res.json(), null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "my_data.json";
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   async function submit(e: FormEvent) {
     e.preventDefault();
     setMsg("");
@@ -170,6 +186,15 @@ export default function SettingsPage() {
         </form>
       </div>
       <ApiKeys />
+      <div className="card max-w-md p-6">
+        <h2 className="mb-1 flex items-center gap-1.5 font-display text-lg font-semibold">
+          <Download className="h-4 w-4" /> 数据与隐私
+        </h2>
+        <p className="mb-4 text-xs text-ink-faint">导出你的个人数据（资料、评论、收藏、API Key 元数据）。</p>
+        <button onClick={exportData} className="btn-ghost">
+          <Download className="h-4 w-4" /> 导出我的数据 (JSON)
+        </button>
+      </div>
     </div>
   );
 }

@@ -77,6 +77,34 @@ async def test_login_lockout_after_repeated_failures(client, session):
     auth_service.reset_lockout()
 
 
+async def test_me_export_returns_personal_data(client, session):
+    from app.repositories import kb_repo, wiki_repo
+
+    admin = await org_service.create_user(
+        session, email="admin@x.com", password="pw123456", display_name="Admin", role="admin"
+    )
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    page = await wiki_repo.upsert(session, kb_id=kb.id, slug="p", title="P", page_type="concept",
+                                 content_md="x", frontmatter={}, source_ids=[])
+    await session.commit()
+    from app.core.deps import get_current_user
+    from app.main import app
+
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        await client.post(f"/api/pages/{page.id}/comments", json={"body": "我的评论"})
+        await client.post(f"/api/pages/{page.id}/favorite")
+        r = await client.get("/api/me/export")
+        assert r.status_code == 200
+        body = r.json()
+        assert body["profile"]["email"] == "admin@x.com"
+        assert any(c["body"] == "我的评论" for c in body["comments"])
+        assert any(f["page_id"] == str(page.id) for f in body["favorites"])
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_login_bad_password(client, session):
     await org_service.create_user(session, email="u@x.com", password="right1", display_name="U")
     await session.commit()
