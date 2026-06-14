@@ -84,10 +84,28 @@ export default function AdminPage() {
                 <span className="grid h-7 w-7 place-items-center rounded-full bg-accent-soft font-display text-xs font-semibold text-accent-dark">
                   {u.display_name[0]}
                 </span>
-                <span className="font-medium text-ink">{u.display_name}</span>
+                <span className={`font-medium ${u.is_active === false ? "text-ink-faint line-through" : "text-ink"}`}>
+                  {u.display_name}
+                </span>
                 <span className="text-ink-faint">{u.email}</span>
-                <span className="ml-auto">
+                <span className="ml-auto flex items-center gap-2">
                   <Badge tone={u.role === "admin" ? "company" : "personal"}>{u.role}</Badge>
+                  {u.is_active === false && <Badge tone="rejected">已停用</Badge>}
+                  {u.is_active === false ? (
+                    <button
+                      onClick={() => run(() => postJson(`/users/${u.id}/activate`, {}), "已启用")}
+                      className="text-xs text-accent hover:underline"
+                    >
+                      启用
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => run(() => postJson(`/users/${u.id}/deactivate`, {}), "已停用")}
+                      className="text-xs text-red-600 hover:underline"
+                    >
+                      停用
+                    </button>
+                  )}
                 </span>
               </li>
             ))}

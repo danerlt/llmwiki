@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, Integer, String, Uuid
+from sqlalchemy import Boolean, ForeignKey, Integer, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -16,6 +16,7 @@ class User(Base):
     role: Mapped[str] = mapped_column(String(16), default="user")
     # 会话版本：登出/封禁/改密时自增，使该用户所有存量 JWT 立即失效（无状态令牌的吊销手段）
     token_version: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True)  # 停用即拒绝鉴权
     department_id: Mapped[uuid.UUID | None] = mapped_column(
         Uuid, ForeignKey("departments.id"), nullable=True
     )

@@ -41,6 +41,10 @@ async def list_all(session: AsyncSession) -> list[User]:
     return list(res.scalars().all())
 
 
+async def set_active(session: AsyncSession, user_id: uuid.UUID, active: bool) -> None:
+    await session.execute(update(User).where(User.id == user_id).values(is_active=active))
+
+
 async def set_password(session: AsyncSession, user_id: uuid.UUID, password_hash: str) -> None:
     await session.execute(
         update(User).where(User.id == user_id).values(password_hash=password_hash)

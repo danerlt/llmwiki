@@ -24,5 +24,6 @@ class UserOut(BaseModel):
     display_name: str
     role: str
     department_id: uuid.UUID | None
+    is_active: bool = True
 
     model_config = {"from_attributes": True}

@@ -4,6 +4,7 @@ export interface UserOut {
   display_name: string;
   role: string;
   department_id: string | null;
+  is_active?: boolean;
 }
 export interface KB {
   id: string;

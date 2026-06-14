@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import require_admin
@@ -70,6 +70,41 @@ async def add_member(
                                detail={"user_id": str(body.user_id)})
     await session.commit()
     return {"status": "ok"}
+
+
+@router.post("/users/{user_id}/deactivate", response_model=UserOut)
+async def deactivate_user(
+    user_id: uuid.UUID,
+    actor: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    if user_id == actor.id:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="不能停用自己")
+    target = await user_repo.get_by_id(session, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+    await user_repo.set_active(session, user_id, False)
+    await user_repo.bump_token_version(session, user_id)  # 立即切断其所有会话
+    await audit_service.record(session, actor_id=actor.id, action="user.deactivate",
+                               target_type="user", target_id=user_id)
+    await session.commit()
+    return await user_repo.get_by_id(session, user_id)
+
+
+@router.post("/users/{user_id}/activate", response_model=UserOut)
+async def activate_user(
+    user_id: uuid.UUID,
+    actor: User = Depends(require_admin),
+    session: AsyncSession = Depends(get_db),
+):
+    target = await user_repo.get_by_id(session, user_id)
+    if target is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="user not found")
+    await user_repo.set_active(session, user_id, True)
+    await audit_service.record(session, actor_id=actor.id, action="user.activate",
+                               target_type="user", target_id=user_id)
+    await session.commit()
+    return await user_repo.get_by_id(session, user_id)
 
 
 @router.post("/users", response_model=UserOut)
