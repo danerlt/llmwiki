@@ -71,7 +71,7 @@
 
 ### 阶段 6：企业身份与数据治理 🚧
 **目标**：跨过 B 端采购的身份/合规硬门槛。
-- ✅ 会话加固：token_version 吊销 + 自助改密(轮换会话) + 管理员停用/启用(离职即时切断) / ⬜ refresh token ⬜ 登录失败锁定 ⬜ MFA
+- ✅ 会话加固：token_version 吊销 + 自助改密(轮换会话) + 管理员停用/启用 + 登录失败锁定(暴力破解防护) / ⬜ refresh token ⬜ MFA
 - ⬜ SSO（OIDC + SAML 2.0）；SCIM 2.0 用户/组 provisioning
 - ⬜ 细粒度自定义 RBAC + 资源级 ACL（KB/页级共享、只读成员）
 - 🚧 数据治理：✅审计 CSV 导出(可按动作过滤) / ⬜ 保留策略、GDPR DSAR、备份恢复、审计防篡改
