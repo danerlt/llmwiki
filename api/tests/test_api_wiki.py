@@ -101,6 +101,20 @@ async def test_page_tags_create_and_filter(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_page_verify_and_unverify(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        pid = (await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "权威页"})).json()["id"]
+        v = await client.post(f"/api/pages/{pid}/verify")
+        assert v.status_code == 200 and v.json()["verified_at"] is not None
+        assert v.json()["verified_by_name"] == "Admin"
+        u = await client.delete(f"/api/pages/{pid}/verify")
+        assert u.status_code == 200 and u.json()["verified_at"] is None
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_create_page_forbidden_without_write(session, client):
     kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
     await session.flush()

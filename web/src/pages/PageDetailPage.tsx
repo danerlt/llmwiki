@@ -9,6 +9,7 @@ import {
   History,
   Link2,
   Pencil,
+  ShieldCheck,
   Star,
   Tag,
 } from "lucide-react";
@@ -102,6 +103,18 @@ export default function PageDetailPage() {
     }
   }
 
+  async function toggleVerify() {
+    if (!page) return;
+    try {
+      const updated = page.verified_at
+        ? await del<PageDetail>(`/pages/${pageId}/verify`)
+        : await postJson<PageDetail>(`/pages/${pageId}/verify`, {});
+      setPage(updated);
+    } catch {
+      /* ignore */
+    }
+  }
+
   async function toggleSub() {
     const next = !sub;
     setSub(next);
@@ -145,8 +158,23 @@ export default function PageDetailPage() {
       <div className="mb-6 flex items-center gap-3">
         <h1 className="font-display text-3xl font-semibold tracking-tight">{page.title}</h1>
         <Badge>{PT[page.page_type] ?? page.page_type}</Badge>
+        {page.verified_at && (
+          <span
+            className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600"
+            title={`由 ${page.verified_by_name ?? "?"} 认证`}
+          >
+            <ShieldCheck className="h-4 w-4" /> 已认证
+          </span>
+        )}
         {page.page_type !== "index" && (
           <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={toggleVerify}
+              className={`btn-ghost ${page.verified_at ? "text-emerald-600" : ""}`}
+              title="内容认证（专家背书）"
+            >
+              <ShieldCheck className="h-4 w-4" /> {page.verified_at ? "取消认证" : "认证"}
+            </button>
             <button
               onClick={toggleFav}
               className={`btn-ghost ${fav ? "text-amber-500" : ""}`}

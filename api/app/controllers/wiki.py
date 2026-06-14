@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -12,6 +13,7 @@ from app.repositories import (
     kb_repo,
     source_repo,
     subscription_repo,
+    user_repo,
     wiki_repo,
 )
 from app.schemas.wiki import (
@@ -53,6 +55,10 @@ async def _build_detail(
     # 仅返回可见 KB 的来源——晋升等路径可能让页的 source_ids 指向跨作用域的 Source，
     # 与 backlinks/outlinks 的可见性过滤保持一致，避免泄漏他人作用域的源文件名。
     sources = [s for s in await source_repo.list_by_ids(session, src_ids) if s.kb_id in accessible]
+    verifier_name = None
+    if page.verified_by:
+        v = await user_repo.get_by_id(session, page.verified_by)
+        verifier_name = v.display_name if v else None
     return PageDetailOut(
         id=page.id,
         kb_id=page.kb_id,
@@ -63,6 +69,8 @@ async def _build_detail(
         frontmatter=page.frontmatter or {},
         source_ids=[str(s) for s in (page.source_ids or [])],
         updated_at=page.updated_at,
+        verified_at=page.verified_at,
+        verified_by_name=verifier_name,
         is_favorited=is_favorited,
         is_subscribed=is_subscribed,
         backlinks=[
@@ -256,6 +264,43 @@ async def revert_page(
         target_id=page.id, detail={"kb_id": str(page.kb_id), "to_version": version_no},
     )
     await session.commit()
+    accessible = await permission_service.accessible_kb_ids(session, user)
+    return await _build_detail(session, page, accessible)
+
+
+@router.post("/pages/{page_id}/verify", response_model=PageDetailOut)
+async def verify_page(
+    page_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    """认证页面为权威内容（专家背书）。需对该页有写权限。"""
+    page = await _writable_page(session, page_id, user)
+    page.verified_by = user.id
+    page.verified_at = datetime.now(timezone.utc)
+    await audit_service.record(
+        session, actor_id=user.id, action="page.verify", target_type="page", target_id=page.id
+    )
+    await session.commit()
+    await session.refresh(page)  # 重载 server onupdate 的 updated_at，避免同步构造触发 lazy load
+    accessible = await permission_service.accessible_kb_ids(session, user)
+    return await _build_detail(session, page, accessible)
+
+
+@router.delete("/pages/{page_id}/verify", response_model=PageDetailOut)
+async def unverify_page(
+    page_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+):
+    page = await _writable_page(session, page_id, user)
+    page.verified_by = None
+    page.verified_at = None
+    await audit_service.record(
+        session, actor_id=user.id, action="page.unverify", target_type="page", target_id=page.id
+    )
+    await session.commit()
+    await session.refresh(page)
     accessible = await permission_service.accessible_kb_ids(session, user)
     return await _build_detail(session, page, accessible)
 

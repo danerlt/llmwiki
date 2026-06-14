@@ -49,6 +49,8 @@ export interface PageDetail extends PageOut {
   frontmatter: Record<string, unknown>;
   source_ids: string[];
   updated_at?: string | null;
+  verified_at?: string | null;
+  verified_by_name?: string | null;
   is_favorited?: boolean;
   is_subscribed?: boolean;
   backlinks?: PageOut[];

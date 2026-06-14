@@ -59,6 +59,8 @@ class PageDetailOut(PageOut):
     frontmatter: dict
     source_ids: list[str]
     updated_at: datetime | None = None
+    verified_at: datetime | None = None
+    verified_by_name: str | None = None
     is_favorited: bool = False
     is_subscribed: bool = False
     backlinks: list[PageOut] = []
