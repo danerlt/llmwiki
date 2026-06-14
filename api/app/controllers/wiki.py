@@ -1,6 +1,6 @@
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.deps import get_current_user
@@ -55,6 +55,7 @@ async def _build_detail(
             for o in outlinks
         ],
         sources=[SourceRef(id=s.id, filename=s.filename) for s in sources],
+        tags=list(page.tags or []),
     )
 
 
@@ -84,13 +85,17 @@ async def _post_write_rebuild(
 @router.get("/kbs/{kb_id}/pages", response_model=list[PageOut])
 async def list_pages(
     kb_id: uuid.UUID,
+    tag: str | None = Query(None, description="按标签过滤"),
     user: User = Depends(get_current_user),
     session: AsyncSession = Depends(get_db),
 ):
     accessible = await permission_service.accessible_kb_ids(session, user)
     if kb_id not in accessible:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
-    return await wiki_repo.list_by_kb(session, kb_id)
+    pages = await wiki_repo.list_by_kb(session, kb_id)
+    if tag:
+        pages = [p for p in pages if tag in (p.tags or [])]
+    return pages
 
 
 @router.post("/kbs/{kb_id}/pages", response_model=PageDetailOut, status_code=status.HTTP_201_CREATED)
@@ -119,6 +124,7 @@ async def create_page(
         session, kb_id=kb_id, slug=slug, title=body.title, page_type=body.page_type,
         content_md=body.content_md, frontmatter={"author": str(user.id)}, source_ids=[],
     )
+    page.tags = [t.strip() for t in body.tags if t.strip()]
     await session.flush()
     await wiki_repo.add_version(session, page, edited_by=user.id)  # v1 = 初始内容
     await _post_write_rebuild(session, page, body.content_md)
@@ -150,6 +156,8 @@ async def update_page(
         page.content_md = body.content_md
     if body.page_type is not None:
         page.page_type = body.page_type
+    if body.tags is not None:
+        page.tags = [t.strip() for t in body.tags if t.strip()]
     await session.flush()
     await wiki_repo.add_version(session, page, edited_by=user.id)  # 每次保存留版本
     await _post_write_rebuild(session, page, page.content_md or "")

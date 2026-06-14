@@ -25,6 +25,7 @@ export default function PageEditPage() {
   const [title, setTitle] = useState("");
   const [slug, setSlug] = useState("");
   const [pageType, setPageType] = useState("concept");
+  const [tags, setTags] = useState("");
   const [content, setContent] = useState("");
   const [loading, setLoading] = useState(isEdit);
   const [saving, setSaving] = useState(false);
@@ -37,6 +38,7 @@ export default function PageEditPage() {
         setTitle(p.title);
         setSlug(p.slug);
         setPageType(PAGE_TYPES.some((t) => t.v === p.page_type) ? p.page_type : "concept");
+        setTags((p.tags ?? []).join(", "));
         setContent(p.content_md);
       })
       .catch(() => setErr("加载页面失败"))
@@ -51,12 +53,14 @@ export default function PageEditPage() {
     }
     setSaving(true);
     setErr("");
+    const tagList = tags.split(",").map((t) => t.trim()).filter(Boolean);
     try {
       if (isEdit) {
         const p = await putJson<PageDetail>(`/pages/${pageId}`, {
           title,
           content_md: content,
           page_type: pageType,
+          tags: tagList,
         });
         navigate(`/pages/${p.id}`);
       } else {
@@ -65,6 +69,7 @@ export default function PageEditPage() {
           slug: slug.trim() || undefined,
           content_md: content,
           page_type: pageType,
+          tags: tagList,
         });
         navigate(`/pages/${p.id}`);
       }
@@ -129,6 +134,12 @@ export default function PageEditPage() {
             ))}
           </select>
         </div>
+        <input
+          className="field"
+          value={tags}
+          onChange={(e) => setTags(e.target.value)}
+          placeholder="标签（逗号分隔，如：后端, python, 架构）"
+        />
 
         <div className="grid gap-4 lg:grid-cols-2">
           <textarea

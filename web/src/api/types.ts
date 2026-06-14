@@ -33,6 +33,7 @@ export interface PageOut {
   title: string;
   slug: string;
   page_type: string;
+  tags?: string[];
 }
 export interface SourceRef {
   id: string;

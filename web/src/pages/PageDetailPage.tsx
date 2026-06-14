@@ -8,6 +8,7 @@ import {
   History,
   Link2,
   Pencil,
+  Tag,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
@@ -157,6 +158,22 @@ export default function PageDetailPage() {
               </div>
             </dl>
           </AsideCard>
+
+          {page.tags && page.tags.length > 0 && (
+            <AsideCard icon={<Tag className="h-3.5 w-3.5" />} title="标签">
+              <div className="flex flex-wrap gap-1.5">
+                {page.tags.map((t) => (
+                  <Link
+                    key={t}
+                    to={`/kbs/${page.kb_id}/pages?tag=${encodeURIComponent(t)}`}
+                    className="chip text-xs transition hover:border-accent/40 hover:text-accent-dark"
+                  >
+                    {t}
+                  </Link>
+                ))}
+              </div>
+            </AsideCard>
+          )}
 
           {page.sources && page.sources.length > 0 && (
             <AsideCard icon={<FileText className="h-3.5 w-3.5" />} title="来源">

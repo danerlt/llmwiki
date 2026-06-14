@@ -84,6 +84,23 @@ async def test_create_edit_history_revert_flow(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_page_tags_create_and_filter(session, client):
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        r = await client.post(
+            f"/api/kbs/{kb.id}/pages",
+            json={"title": "带标签", "content_md": "x", "tags": ["后端", "python"]},
+        )
+        assert r.status_code == 201 and set(r.json()["tags"]) == {"后端", "python"}
+        await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "无标签", "slug": "no-tag"})
+        filtered = await client.get(f"/api/kbs/{kb.id}/pages?tag=python")
+        titles = [p["title"] for p in filtered.json()]
+        assert "带标签" in titles and "无标签" not in titles
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_create_page_forbidden_without_write(session, client):
     kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
     await session.flush()

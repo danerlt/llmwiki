@@ -12,12 +12,14 @@ class PageCreate(BaseModel):
     slug: str | None = Field(default=None, max_length=512)
     content_md: str = Field(default="", max_length=200_000)
     page_type: str = Field(default="concept")
+    tags: list[str] = Field(default_factory=list, max_length=30)
 
 
 class PageUpdate(BaseModel):
     title: str | None = Field(default=None, min_length=1, max_length=512)
     content_md: str | None = Field(default=None, max_length=200_000)
     page_type: str | None = None
+    tags: list[str] | None = Field(default=None, max_length=30)
 
 
 class PageVersionOut(BaseModel):
@@ -37,6 +39,7 @@ class PageOut(BaseModel):
     title: str
     slug: str
     page_type: str
+    tags: list[str] = []
 
     model_config = {"from_attributes": True}
 

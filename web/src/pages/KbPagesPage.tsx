@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { ChevronRight, FileText, Loader2, Plus, RotateCcw, Upload } from "lucide-react";
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useSearchParams } from "react-router-dom";
 
 import { apiFetch, getToken, postJson, setToken } from "../api/client";
 import type { KB, PageOut, SourceOut } from "../api/types";
@@ -27,6 +27,8 @@ function isBusy(s: SourceOut) {
 
 export default function KbPagesPage() {
   const { kbId = "" } = useParams();
+  const [sp] = useSearchParams();
+  const tag = sp.get("tag");
   const [kbName, setKbName] = useState("");
   const [pages, setPages] = useState<PageOut[] | null>(null);
   const [sources, setSources] = useState<SourceOut[] | null>(null);
@@ -41,7 +43,8 @@ export default function KbPagesPage() {
   const activeKbRef = useRef(kbId);
 
   function loadPages() {
-    apiFetch<PageOut[]>(`/kbs/${kbId}/pages`)
+    const q = tag ? `?tag=${encodeURIComponent(tag)}` : "";
+    apiFetch<PageOut[]>(`/kbs/${kbId}/pages${q}`)
       .then((p) => {
         if (activeKbRef.current === kbId) setPages(p);
       })
@@ -83,7 +86,7 @@ export default function KbPagesPage() {
       pollingRef.current = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [kbId]);
+  }, [kbId, tag]);
 
   async function upload(e: FormEvent) {
     e.preventDefault();
@@ -155,6 +158,16 @@ export default function KbPagesPage() {
           <Plus className="h-4 w-4" /> 新建页
         </Link>
       </div>
+
+      {tag && (
+        <div className="mb-4 flex items-center gap-2 text-sm">
+          <span className="text-ink-muted">标签筛选：</span>
+          <span className="chip border-accent/50 bg-accent-soft text-accent-dark">{tag}</span>
+          <Link to={`/kbs/${kbId}/pages`} className="text-xs text-accent hover:underline">
+            清除
+          </Link>
+        </div>
+      )}
 
       <form onSubmit={upload} className="card mb-5 flex flex-wrap items-center gap-3 p-4">
         <label className="btn-ghost cursor-pointer">
