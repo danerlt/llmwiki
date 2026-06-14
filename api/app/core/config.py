@@ -16,6 +16,7 @@ class Settings(BaseSettings):
     arq_max_tries: int = 3
     arq_job_timeout: int = 900
     max_upload_bytes: int = 50 * 1024 * 1024  # 单文件上限，与 nginx client_max_body_size 对齐
+    rate_limit_per_min: int = 0  # 每 IP 每分钟请求上限，<=0 关闭（生产按需开启）
 
     jwt_secret: str = "change-me-in-prod"
     jwt_expire_min: int = 480  # 8h，缩短被盗令牌的有效窗口（配合 token_version 吊销）
