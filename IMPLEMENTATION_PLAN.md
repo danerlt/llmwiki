@@ -51,6 +51,7 @@
 - ✅ 人工页 CRUD：POST/PUT/DELETE，受 can_write 约束；slug 唯一(409)、系统页类型拒绝、wikilink 重建、审计
 - ✅ 前端 Markdown 编辑器（创建/编辑/删除 + 实时预览，复用渲染）
 - ✅ 版本历史 + 回滚 + 行级 diff 高亮（page_versions 表；历史页查看/回滚/对比上一版）
+- ✅ 页面导出 Markdown（.md 下载）
 - ⬜ 草稿 → 评审 → 发布 状态机（避免半成品污染检索/RAG）
 - ⬜ 软删除 / 回收站 / 恢复（当前为硬删除）
 
@@ -88,3 +89,19 @@
 - ⬜ 多租户隔离层（organization/tenant）
 - ⬜ 更多数据源：docx/pptx/xlsx/html/网页抓取/Confluence 导入；扫描件 OCR
 - ⬜ CI/CD 流水线与质量门禁（消除 SQLite↔PG 行为漂移，真实 PG 集成测试）
+
+---
+
+## 剩余工作与阻塞项（诚实小结）
+
+**已成体系**：阶段 1–4 核心全部完成；阶段 5/6/7/8 主干完成。后端 143 测试 + 前端 7 全绿，全栈在线。
+
+**可继续自主推进（无外部依赖）**：
+- refresh token + 滑动续期；细粒度 ACL（只读成员/页级共享）；活动流；过期复审提醒
+- 搜索无果词记录（知识空缺）；个性化推荐；i18n（大前端重构）
+- 被遗忘权（账号级联删除）；备份/恢复脚本；CI/CD（GitHub Actions + 真实 PG 集成测试）
+
+**需老板拍板才能落地（阻塞，不擅自决定）**：
+- **向量/混合语义检索**：DeepSeek 无 embedding 接口。需二选一——(A) 接 OpenAI/智谱等 embedding API（需 key + 成本）；(B) 本地 sentence-transformers（引入 ~2GB torch，镜像与内存显著变重）。请指定方案。
+- **SSO（OIDC/SAML）+ SCIM**：需提供企业 IdP（如 Azure AD/Okta/Keycloak）的对接信息才能联调。
+- **多租户隔离层**：是否做成多客户 SaaS 硬隔离？这是较大的架构改造，需确认目标部署形态。
