@@ -1,6 +1,7 @@
 import { useEffect, useState, type ReactNode } from "react";
 
 import {
+  BarChart3,
   Bell,
   Inbox,
   LayoutDashboard,
@@ -99,6 +100,7 @@ export default function Layout() {
                 管理
               </div>
               <NavItem to="/admin" icon={<Users className="h-[18px] w-[18px]" />} label="组织管理" />
+              <NavItem to="/analytics" icon={<BarChart3 className="h-[18px] w-[18px]" />} label="分析" />
               <NavItem to="/audit" icon={<ScrollText className="h-[18px] w-[18px]" />} label="审计日志" />
             </>
           )}

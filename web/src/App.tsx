@@ -4,6 +4,7 @@ import { AuthProvider } from "./auth/AuthContext";
 import ProtectedRoute from "./auth/ProtectedRoute";
 import Layout from "./components/Layout";
 import AdminPage from "./pages/AdminPage";
+import AnalyticsPage from "./pages/AnalyticsPage";
 import AuditPage from "./pages/AuditPage";
 import KbListPage from "./pages/KbListPage";
 import KbPagesPage from "./pages/KbPagesPage";
@@ -33,6 +34,7 @@ export default function App() {
             <Route path="/query" element={<QueryPage />} />
             <Route path="/notifications" element={<NotificationsPage />} />
             <Route path="/admin" element={<AdminPage />} />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route path="/reviews" element={<ReviewsPage />} />
             <Route path="/audit" element={<AuditPage />} />
           </Route>

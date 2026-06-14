@@ -219,6 +219,33 @@ async def outlinks(session: AsyncSession, page_id: uuid.UUID) -> list[WikiPage]:
     return list(res.scalars().unique().all())
 
 
+async def stale_pages(session: AsyncSession, before, limit: int = 50) -> list[WikiPage]:
+    """陈旧页：updated_at 早于阈值的非 index 页（最旧在前）。"""
+    res = await session.execute(
+        select(WikiPage)
+        .where(WikiPage.page_type != "index", WikiPage.updated_at < before)
+        .order_by(WikiPage.updated_at)
+        .limit(limit)
+    )
+    return list(res.scalars().all())
+
+
+async def orphan_pages(session: AsyncSession, limit: int = 50) -> list[WikiPage]:
+    """孤儿页：既无出链也无入链的非 index 页（知识孤岛，难被发现）。"""
+    from_ids = select(PageLink.from_page_id)
+    to_ids = select(PageLink.to_page_id).where(PageLink.to_page_id.is_not(None))
+    res = await session.execute(
+        select(WikiPage)
+        .where(
+            WikiPage.page_type != "index",
+            WikiPage.id.not_in(from_ids),
+            WikiPage.id.not_in(to_ids),
+        )
+        .limit(limit)
+    )
+    return list(res.scalars().all())
+
+
 async def recent(
     session: AsyncSession, kb_ids: list[uuid.UUID], limit: int = 8
 ) -> list[WikiPage]:
