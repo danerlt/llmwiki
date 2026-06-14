@@ -131,13 +131,13 @@ class WikiService:
             raise ForbiddenException("no write permission")
         if body.page_type not in HUMAN_PAGE_TYPES:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"page_type must be one of {HUMAN_PAGE_TYPES}",
             )
         slug = parser.slugify(body.slug or body.title)
         if not slug:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="invalid slug"
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT, detail="invalid slug"
             )
         if await wiki_repo.get_by_slug(session, kb_id, slug) is not None:
             raise ConflictException("slug already exists")
@@ -163,7 +163,7 @@ class WikiService:
         page = await self._writable_page(session, page_id, user)
         if body.page_type is not None and body.page_type not in HUMAN_PAGE_TYPES:
             raise HTTPException(
-                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
                 detail=f"page_type must be one of {HUMAN_PAGE_TYPES}",
             )
         if body.title is not None:

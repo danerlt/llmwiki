@@ -64,7 +64,7 @@ class SourceService:
             buf.extend(chunk)
             if len(buf) > settings.max_upload_bytes:
                 raise HTTPException(
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="file too large"
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE, detail="file too large"
                 )
         data = bytes(buf)
         if not data:
