@@ -14,6 +14,7 @@ class ErrorCode(str, Enum):
     NOT_FOUND = "404"
     CONFLICT = "409"
     UNPROCESSABLE = "422"
+    TOO_MANY_REQUESTS = "429"
     INTERNAL = "500"
 
 
@@ -71,6 +72,12 @@ class ConflictException(AppException):
     code = ErrorCode.CONFLICT
     http_status = 409
     default_message = "资源冲突"
+
+
+class TooManyRequestsException(AppException):
+    code = ErrorCode.TOO_MANY_REQUESTS
+    http_status = 429
+    default_message = "请求过于频繁，请稍后再试"
 
 
 class DBException(AppException):

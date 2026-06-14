@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.api_response import api_response
@@ -21,11 +21,6 @@ router = APIRouter(tags=["auth"])
 @router.post("/auth/login", response_model=Response[TokenResponse])
 @api_response
 async def login(body: LoginRequest, session: AsyncSession = Depends(get_db)) -> TokenResponse:
-    if auth_service.is_locked(body.email):
-        raise HTTPException(
-            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-            detail="登录失败次数过多，请稍后再试",
-        )
     return await auth_service.login(session, body.email, body.password)
 
 

@@ -4,7 +4,11 @@ import uuid
 from jose import JWTError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.common.exceptions import ParamsException, UnauthorizedException
+from app.common.exceptions import (
+    ParamsException,
+    TooManyRequestsException,
+    UnauthorizedException,
+)
 from app.core.security import (
     create_access_token,
     create_refresh_token,
@@ -46,7 +50,9 @@ class AuthService:
         return user
 
     async def login(self, session: AsyncSession, email: str, password: str) -> TokenResponse:
-        """校验凭据并签发访问/刷新令牌；失败时记录失败计数并抛 401。"""
+        """校验凭据并签发访问/刷新令牌；失败次数超限抛 429，凭据错误记失败计数并抛 401。"""
+        if self.is_locked(email):
+            raise TooManyRequestsException("登录失败次数过多，请稍后再试")
         user = await self.authenticate(session, email, password)
         if user is None:
             self.record_failure(email)

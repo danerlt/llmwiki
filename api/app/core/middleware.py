@@ -70,35 +70,41 @@ class RequestContextMiddleware(BaseHTTPMiddleware):
         token = request_id_ctx.set(rid)
         start = time.perf_counter()
         try:
+            # 日志/metrics/响应头都在 reset 之前记录：此时 request_id_ctx 仍是本请求 rid，
+            # 日志 formatter 注入的 [request_id] 才与消息体一致（reset 移到 finally）。
             response = await call_next(request)
+            dur_ms = (time.perf_counter() - start) * 1000
+            # 探针(health/readyz/metrics)高频且无业务价值，从访问日志过滤以减噪（仍计入 metrics）
+            if request.url.path not in _RL_EXEMPT:
+                _access_logger.info(
+                    "%s %s -> %s %.1fms",
+                    request.method,
+                    request.url.path,
+                    response.status_code,
+                    dur_ms,
+                )
+            if response.status_code >= 400:  # 4xx/5xx 结构化错误日志，便于线上聚合排查
+                _access_logger.warning(
+                    "请求失败 method=%s path=%s status=%s rid=%s %.1fms",
+                    request.method,
+                    request.url.path,
+                    response.status_code,
+                    rid,
+                    dur_ms,
+                )
+            if dur_ms > _SLOW_REQUEST_MS:
+                _access_logger.warning(
+                    "慢请求 %s %s 耗时 %.1fms (>%dms)",
+                    request.method,
+                    request.url.path,
+                    dur_ms,
+                    _SLOW_REQUEST_MS,
+                )
+            metrics.observe(request.method, response.status_code, dur_ms / 1000)
+            response.headers["X-Request-ID"] = rid
+            response.headers["X-Process-Time-Ms"] = f"{dur_ms:.1f}"
+            for key, value in _SECURITY_HEADERS.items():
+                response.headers.setdefault(key, value)
+            return response
         finally:
             request_id_ctx.reset(token)
-        dur_ms = (time.perf_counter() - start) * 1000
-        # 探针(health/readyz/metrics)高频且无业务价值，从访问日志过滤以减噪（仍计入 metrics）
-        if request.url.path not in _RL_EXEMPT:
-            _access_logger.info(
-                "%s %s -> %s %.1fms", request.method, request.url.path, response.status_code, dur_ms
-            )
-        if response.status_code >= 400:  # 4xx/5xx 结构化错误日志，便于线上聚合排查
-            _access_logger.warning(
-                "请求失败 method=%s path=%s status=%s rid=%s %.1fms",
-                request.method,
-                request.url.path,
-                response.status_code,
-                rid,
-                dur_ms,
-            )
-        if dur_ms > _SLOW_REQUEST_MS:
-            _access_logger.warning(
-                "慢请求 %s %s 耗时 %.1fms (>%dms)",
-                request.method,
-                request.url.path,
-                dur_ms,
-                _SLOW_REQUEST_MS,
-            )
-        metrics.observe(request.method, response.status_code, dur_ms / 1000)
-        response.headers["X-Request-ID"] = rid
-        response.headers["X-Process-Time-Ms"] = f"{dur_ms:.1f}"
-        for key, value in _SECURITY_HEADERS.items():
-            response.headers.setdefault(key, value)
-        return response
