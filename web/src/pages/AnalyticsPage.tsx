@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { FileWarning, Ghost, ThumbsDown, ThumbsUp } from "lucide-react";
+import { FileWarning, Ghost, ShieldAlert, ThumbsDown, ThumbsUp } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
@@ -15,6 +15,7 @@ interface Analytics {
   stale_days: number;
   stale_pages: PageBrief[];
   orphan_pages: PageBrief[];
+  review_due_pages: PageBrief[];
 }
 
 function Stat({ icon, label, value }: { icon: ReactNode; label: string; value: ReactNode }) {
@@ -116,6 +117,12 @@ export default function AnalyticsPage() {
           title="孤儿页"
           hint="无任何出链/入链，难被发现，建议补充关联"
           pages={data.orphan_pages}
+        />
+        <PageList
+          icon={<ShieldAlert className="h-4 w-4" />}
+          title="待复审"
+          hint={`已认证但超过 ${data.stale_days} 天未复核，建议重新认证`}
+          pages={data.review_due_pages}
         />
       </div>
     </div>

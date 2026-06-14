@@ -39,6 +39,31 @@ async def test_analytics_orphan_stale_and_feedback(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_analytics_review_due_lists_stale_verified(session, client):
+    from datetime import datetime, timezone
+
+    kb = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
+    await session.flush()
+    admin = await org_service.create_user(
+        session, email="admin@x.com", password="pw123456", display_name="Admin", role="admin"
+    )
+    page = await wiki_repo.upsert(
+        session, kb_id=kb.id, slug="old-verified", title="陈年认证页", page_type="concept",
+        content_md="x", frontmatter={}, source_ids=[],
+    )
+    await session.flush()
+    page.verified_by = admin.id
+    page.verified_at = datetime(2020, 1, 1, tzinfo=timezone.utc)  # 很久以前认证
+    await session.commit()
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        r = await client.get("/api/analytics?stale_days=30")
+        ids = [p["id"] for p in r.json()["review_due_pages"]]
+        assert str(page.id) in ids  # 认证超期 → 待复审
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_analytics_admin_only(session, client):
     user = await org_service.create_user(
         session, email="u@x.com", password="pw123456", display_name="U", role="user"

@@ -230,6 +230,17 @@ async def stale_pages(session: AsyncSession, before, limit: int = 50) -> list[Wi
     return list(res.scalars().all())
 
 
+async def review_due_pages(session: AsyncSession, before, limit: int = 50) -> list[WikiPage]:
+    """认证已超期、需复审的页（verified_at 早于阈值）。"""
+    res = await session.execute(
+        select(WikiPage)
+        .where(WikiPage.verified_at.is_not(None), WikiPage.verified_at < before)
+        .order_by(WikiPage.verified_at)
+        .limit(limit)
+    )
+    return list(res.scalars().all())
+
+
 async def orphan_pages(session: AsyncSession, limit: int = 50) -> list[WikiPage]:
     """孤儿页：既无出链也无入链的非 index 页（知识孤岛，难被发现）。"""
     from_ids = select(PageLink.from_page_id)
