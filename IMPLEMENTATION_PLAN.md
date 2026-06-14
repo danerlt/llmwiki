@@ -88,7 +88,7 @@
 - 🚧 对外 REST API + API Key/服务账号 ✅ + Webhook 出站事件订阅 ✅(HMAC 签名, 页面更新/评论推送)
 - ⬜ 多租户隔离层（organization/tenant）
 - ⬜ 更多数据源：docx/pptx/xlsx/html/网页抓取/Confluence 导入；扫描件 OCR
-- ⬜ CI/CD 流水线与质量门禁（消除 SQLite↔PG 行为漂移，真实 PG 集成测试）
+- 🚧 CI/CD 流水线 ✅(GitHub Actions: 后端 pytest + 前端 build/test, push/PR) / ⬜ 真实 PG 集成测试(消除 SQLite↔PG 漂移)
 
 ---
 
