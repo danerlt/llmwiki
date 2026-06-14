@@ -20,8 +20,7 @@ async def test_ingest_stores_embedding_when_enabled(session, monkeypatch):
 
     from app.models import KnowledgeBase, User
     from app.repositories import source_repo, wiki_repo
-    from app.services import embedding_service as es
-    from app.services import ingest_service
+    from app.services import embedding_service as es, ingest_service
     from tests.fakes import FakeLLM, FakeStorage
 
     monkeypatch.setattr(es, "enabled", lambda: True)
