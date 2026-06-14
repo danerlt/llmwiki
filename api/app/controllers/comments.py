@@ -8,7 +8,12 @@ from app.db.session import get_db
 from app.models import User
 from app.repositories import comment_repo, user_repo, wiki_repo
 from app.schemas.comment import CommentCreate, CommentOut
-from app.services import audit_service, notification_service, permission_service
+from app.services import (
+    audit_service,
+    notification_service,
+    permission_service,
+    webhook_service,
+)
 
 router = APIRouter(tags=["comments"])
 
@@ -60,6 +65,10 @@ async def add_comment(
     await notification_service.notify_watchers(
         session, page_id=page_id, actor_id=user.id, type="page.commented",
         message=f"{user.display_name} 评论了《{page.title}》",
+    )
+    await webhook_service.dispatch(
+        session, "page.commented",
+        {"page_id": str(page_id), "title": page.title, "actor": user.display_name},
     )
     await session.commit()
     return _out(c, user.display_name)

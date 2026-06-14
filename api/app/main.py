@@ -20,6 +20,7 @@ from app.controllers import (
     search,
     sources,
     stats,
+    webhooks,
     wiki,
 )
 from app.core.config import settings
@@ -69,6 +70,7 @@ def create_app() -> FastAPI:
     app.include_router(audit.router, prefix="/api")
     app.include_router(stats.router, prefix="/api")
     app.include_router(analytics.router, prefix="/api")
+    app.include_router(webhooks.router, prefix="/api")
     return app
 
 

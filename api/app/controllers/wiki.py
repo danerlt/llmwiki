@@ -28,6 +28,7 @@ from app.services import (
     kb_service,
     notification_service,
     permission_service,
+    webhook_service,
 )
 
 router = APIRouter(tags=["wiki"])
@@ -186,6 +187,10 @@ async def update_page(
     await notification_service.notify_watchers(
         session, page_id=page.id, actor_id=user.id, type="page.updated",
         message=f"{user.display_name} 编辑了《{page.title}》",
+    )
+    await webhook_service.dispatch(
+        session, "page.updated",
+        {"page_id": str(page.id), "title": page.title, "actor": user.display_name},
     )
     await session.commit()
     accessible = await permission_service.accessible_kb_ids(session, user)

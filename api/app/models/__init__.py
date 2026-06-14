@@ -13,6 +13,7 @@ from app.models.source import Source
 from app.models.subscription import Subscription
 from app.models.team import Team, UserTeam
 from app.models.user import User
+from app.models.webhook import Webhook
 from app.models.wiki_page import WikiPage
 
 __all__ = [
@@ -32,5 +33,6 @@ __all__ = [
     "Team",
     "UserTeam",
     "User",
+    "Webhook",
     "WikiPage",
 ]
