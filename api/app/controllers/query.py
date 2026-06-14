@@ -26,8 +26,9 @@ async def query(
     session: AsyncSession = Depends(get_db),
     llm: LLMClient = Depends(get_llm),
 ):
+    history = [t.model_dump() for t in body.history] if body.history else None
     return await query_service.answer(
-        session, user, body.question, kb_scope=body.kb_scope, llm=llm
+        session, user, body.question, kb_scope=body.kb_scope, llm=llm, history=history
     )
 
 
@@ -39,8 +40,9 @@ async def query_stream(
     llm: LLMClient = Depends(get_llm),
 ):
     """SSE 流式问答：回答边生成边推送，结束推送引用来源。"""
+    history = [t.model_dump() for t in body.history] if body.history else None
     gen = query_service.answer_stream(
-        session, user, body.question, kb_scope=body.kb_scope, llm=llm
+        session, user, body.question, kb_scope=body.kb_scope, llm=llm, history=history
     )
     return StreamingResponse(
         gen,

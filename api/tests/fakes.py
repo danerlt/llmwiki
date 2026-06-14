@@ -24,13 +24,15 @@ class FakeLLM:
         self._responses = list(responses)
         self.calls: list[tuple[str, str]] = []
 
-    async def complete(self, system: str, user: str) -> str:
+    async def complete(self, system: str, user: str, history=None) -> str:
         self.calls.append((system, user))
+        self.history = history
         return self._responses.pop(0) if self._responses else ""
 
-    async def stream(self, system: str, user: str):
+    async def stream(self, system: str, user: str, history=None):
         """逐字 yield 预设响应，模拟流式输出。"""
         self.calls.append((system, user))
+        self.history = history
         text = self._responses.pop(0) if self._responses else ""
         for ch in text:
             yield ch

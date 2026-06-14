@@ -48,14 +48,14 @@ def _filter_citations(answer_text: str, citations: list[dict]) -> list[dict]:
 
 
 async def answer(
-    session: AsyncSession, user: User, question: str, kb_scope=None, *, llm
+    session: AsyncSession, user: User, question: str, kb_scope=None, *, llm, history=None
 ) -> dict:
     prep = await _prepare(session, user, question, kb_scope)
     if prep is None:
         return {"answer": _NO_CONTEXT, "citations": []}
     citations, user_prompt = prep
     try:
-        answer_text = await llm.complete(QUERY_SYSTEM, user_prompt)
+        answer_text = await llm.complete(QUERY_SYSTEM, user_prompt, history=history)
     except Exception:  # noqa: BLE001 — LLM 不可用时降级返回，不裸 500
         return {"answer": "（问答服务暂不可用，请稍后重试）", "citations": citations}
     answer_text = _WIKILINK.sub(r"\1", answer_text)
@@ -67,7 +67,7 @@ def _sse(obj: dict) -> str:
 
 
 async def answer_stream(
-    session: AsyncSession, user: User, question: str, kb_scope=None, *, llm
+    session: AsyncSession, user: User, question: str, kb_scope=None, *, llm, history=None
 ) -> AsyncIterator[str]:
     """SSE 流式问答：先逐 token 推送 {delta}，结束时推送 {done, citations}。"""
     prep = await _prepare(session, user, question, kb_scope)
@@ -78,7 +78,7 @@ async def answer_stream(
     citations, user_prompt = prep
     acc: list[str] = []
     try:
-        async for delta in llm.stream(QUERY_SYSTEM, user_prompt):
+        async for delta in llm.stream(QUERY_SYSTEM, user_prompt, history=history):
             acc.append(delta)
             yield _sse({"delta": delta})
     except Exception:  # noqa: BLE001 — 流中断则降级收尾

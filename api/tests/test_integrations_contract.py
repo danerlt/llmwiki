@@ -27,6 +27,22 @@ def test_llm_client_constructs():
     assert c.model == "m"
 
 
+def test_llm_messages_includes_history_and_filters_bad_roles():
+    msgs = LLMClient._messages(
+        "sys", "now",
+        [
+            {"role": "user", "content": "q1"},
+            {"role": "assistant", "content": "a1"},
+            {"role": "system", "content": "inject"},  # 非 user/assistant 应被过滤
+        ],
+    )
+    assert msgs[0] == {"role": "system", "content": "sys"}
+    assert {"role": "user", "content": "q1"} in msgs
+    assert {"role": "assistant", "content": "a1"} in msgs
+    assert msgs[-1] == {"role": "user", "content": "now"}
+    assert sum(1 for m in msgs if m["role"] == "system") == 1  # 仅开头系统提示，注入被剔除
+
+
 @pytest.mark.asyncio
 async def test_llm_retries_on_5xx_then_succeeds():
     n = {"calls": 0}

@@ -36,11 +36,22 @@ class LLMClient:
         self.backoff_base = backoff_base
         self._transport = transport
 
-    async def complete(self, system: str, user: str) -> str:
+    @staticmethod
+    def _messages(system: str, user: str, history: list[dict] | None) -> list[dict]:
+        msgs = [{"role": "system", "content": system}]
+        for turn in history or []:
+            role = turn.get("role")
+            content = turn.get("content")
+            if role in ("user", "assistant") and isinstance(content, str) and content:
+                msgs.append({"role": role, "content": content})
+        msgs.append({"role": "user", "content": user})
+        return msgs
+
+    async def complete(self, system: str, user: str, history: list[dict] | None = None) -> str:
         last_exc: Exception | None = None
         for attempt in range(self.max_retries + 1):
             try:
-                return await self._call(system, user)
+                return await self._call(system, user, history)
             except _RETRIABLE_EXC as exc:
                 last_exc = exc
             except httpx.HTTPStatusError as exc:
@@ -53,17 +64,14 @@ class LLMClient:
         assert last_exc is not None
         raise last_exc
 
-    async def _call(self, system: str, user: str) -> str:
+    async def _call(self, system: str, user: str, history: list[dict] | None = None) -> str:
         async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as client:
             resp = await client.post(
                 f"{self.base_url}/chat/completions",
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 json={
                     "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
+                    "messages": self._messages(system, user, history),
                     "temperature": 0,
                 },
             )
@@ -79,7 +87,9 @@ class LLMClient:
                 raise ValueError(f"LLM 返回结构异常: {str(data)[:200]}")
             return content
 
-    async def stream(self, system: str, user: str) -> AsyncIterator[str]:
+    async def stream(
+        self, system: str, user: str, history: list[dict] | None = None
+    ) -> AsyncIterator[str]:
         """流式生成：逐块 yield 文本增量（SSE delta.content）。失败中途抛出由调用方收尾。"""
         async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as client:
             async with client.stream(
@@ -88,10 +98,7 @@ class LLMClient:
                 headers={"Authorization": f"Bearer {self.api_key}"},
                 json={
                     "model": self.model,
-                    "messages": [
-                        {"role": "system", "content": system},
-                        {"role": "user", "content": user},
-                    ],
+                    "messages": self._messages(system, user, history),
                     "temperature": 0,
                     "stream": True,
                 },
