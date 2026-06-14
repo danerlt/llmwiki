@@ -2,6 +2,7 @@ from app.models.answer_feedback import AnswerFeedback
 from app.models.audit_event import AuditEvent
 from app.models.comment import Comment
 from app.models.department import Department
+from app.models.favorite import Favorite
 from app.models.knowledge_base import KnowledgeBase
 from app.models.page_link import PageLink
 from app.models.page_version import PageVersion
@@ -16,6 +17,7 @@ __all__ = [
     "AuditEvent",
     "Comment",
     "Department",
+    "Favorite",
     "KnowledgeBase",
     "PageLink",
     "PageVersion",

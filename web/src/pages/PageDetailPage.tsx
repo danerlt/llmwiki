@@ -8,11 +8,12 @@ import {
   History,
   Link2,
   Pencil,
+  Star,
   Tag,
 } from "lucide-react";
 import { Link, useParams } from "react-router-dom";
 
-import { ApiError, apiFetch, postJson } from "../api/client";
+import { ApiError, apiFetch, del, postJson } from "../api/client";
 import type { KB, PageDetail, PageOut } from "../api/types";
 import Comments from "../components/Comments";
 import Markdown from "../components/Markdown";
@@ -49,6 +50,7 @@ export default function PageDetailPage() {
   const [kbs, setKbs] = useState<KB[]>([]);
   const [target, setTarget] = useState("");
   const [promoteMsg, setPromoteMsg] = useState("");
+  const [fav, setFav] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -59,6 +61,7 @@ export default function PageDetailPage() {
       .then(async (p) => {
         if (cancelled) return;
         setPage(p);
+        setFav(!!p.is_favorited);
         const sibs = await apiFetch<PageOut[]>(`/kbs/${p.kb_id}/pages`);
         if (cancelled) return;
         setSiblings(sibs);
@@ -84,6 +87,17 @@ export default function PageDetailPage() {
   useEffect(() => {
     if (page) setKbName(kbs.find((k) => k.id === page.kb_id)?.name ?? "知识库");
   }, [page, kbs]);
+
+  async function toggleFav() {
+    const next = !fav;
+    setFav(next);
+    try {
+      if (next) await postJson(`/pages/${pageId}/favorite`, {});
+      else await del(`/pages/${pageId}/favorite`);
+    } catch {
+      setFav(!next); // 失败回滚
+    }
+  }
 
   async function promote() {
     if (!target) return;
@@ -119,6 +133,13 @@ export default function PageDetailPage() {
         <Badge>{PT[page.page_type] ?? page.page_type}</Badge>
         {page.page_type !== "index" && (
           <div className="ml-auto flex items-center gap-2">
+            <button
+              onClick={toggleFav}
+              className={`btn-ghost ${fav ? "text-amber-500" : ""}`}
+              title={fav ? "取消收藏" : "收藏"}
+            >
+              <Star className={`h-4 w-4 ${fav ? "fill-amber-400" : ""}`} /> {fav ? "已收藏" : "收藏"}
+            </button>
             <Link to={`/pages/${page.id}/edit`} className="btn-ghost">
               <Pencil className="h-4 w-4" /> 编辑
             </Link>

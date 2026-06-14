@@ -1,5 +1,5 @@
 import { useEffect, useState, type ReactNode } from "react";
-import { ChevronRight, FileText, Inbox, Layers, Library, Search, Sparkles } from "lucide-react";
+import { ChevronRight, FileText, Inbox, Layers, Library, Search, Sparkles, Star } from "lucide-react";
 import { Link } from "react-router-dom";
 
 import { apiFetch } from "../api/client";
@@ -32,11 +32,13 @@ export default function KbListPage() {
   const { user } = useAuth();
   const [stats, setStats] = useState<Stats | null>(null);
   const [recent, setRecent] = useState<PageOut[]>([]);
+  const [favs, setFavs] = useState<PageOut[]>([]);
   const [kbs, setKbs] = useState<KB[] | null>(null);
 
   useEffect(() => {
     apiFetch<Stats>("/stats").then(setStats).catch(() => {});
     apiFetch<PageOut[]>("/recent-pages").then(setRecent).catch(() => {});
+    apiFetch<PageOut[]>("/favorites").then(setFavs).catch(() => {});
     apiFetch<KB[]>("/kbs").then(setKbs).catch(() => {});
   }, []);
 
@@ -111,6 +113,27 @@ export default function KbListPage() {
                 </li>
               ))}
             </ul>
+          )}
+
+          {favs.length > 0 && (
+            <>
+              <h2 className="mb-3 mt-8 flex items-center gap-1.5 font-display text-lg font-semibold tracking-tight">
+                <Star className="h-4 w-4 fill-amber-400 text-amber-500" /> 我的收藏
+              </h2>
+              <ul className="card divide-y divide-line overflow-hidden">
+                {favs.map((p) => (
+                  <li key={p.id}>
+                    <Link
+                      to={`/pages/${p.id}`}
+                      className="flex items-center gap-2.5 px-4 py-3 text-sm transition hover:bg-paper"
+                    >
+                      <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
+                      <span className="flex-1 truncate text-ink">{p.title}</span>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </>
           )}
         </section>
       </div>

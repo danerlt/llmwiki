@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Comment, PageLink, PageVersion, WikiPage
+from app.models import Comment, Favorite, PageLink, PageVersion, WikiPage
 
 
 async def get_by_slug(session: AsyncSession, kb_id: uuid.UUID, slug: str) -> WikiPage | None:
@@ -84,6 +84,7 @@ async def delete_page(session: AsyncSession, page_id: uuid.UUID) -> None:
     )
     await session.execute(delete(PageVersion).where(PageVersion.page_id == page_id))
     await session.execute(delete(Comment).where(Comment.page_id == page_id))
+    await session.execute(delete(Favorite).where(Favorite.page_id == page_id))
     await session.execute(delete(WikiPage).where(WikiPage.id == page_id))
 
 

@@ -7,7 +7,7 @@ from app.core.deps import get_current_user
 from app.db.session import get_db
 from app.ingest import parser, pipeline
 from app.models import User
-from app.repositories import kb_repo, source_repo, wiki_repo
+from app.repositories import favorite_repo, kb_repo, source_repo, wiki_repo
 from app.schemas.wiki import (
     HUMAN_PAGE_TYPES,
     PageCreate,
@@ -23,7 +23,7 @@ router = APIRouter(tags=["wiki"])
 
 
 async def _build_detail(
-    session: AsyncSession, page, accessible: set[uuid.UUID]
+    session: AsyncSession, page, accessible: set[uuid.UUID], *, is_favorited: bool = False
 ) -> PageDetailOut:
     backlinks = [b for b in await wiki_repo.backlinks(session, page.id) if b.kb_id in accessible]
     outlinks = [o for o in await wiki_repo.outlinks(session, page.id) if o.kb_id in accessible]
@@ -46,6 +46,7 @@ async def _build_detail(
         frontmatter=page.frontmatter or {},
         source_ids=[str(s) for s in (page.source_ids or [])],
         updated_at=page.updated_at,
+        is_favorited=is_favorited,
         backlinks=[
             PageOut(id=b.id, kb_id=b.kb_id, title=b.title, slug=b.slug, page_type=b.page_type)
             for b in backlinks
@@ -253,4 +254,5 @@ async def get_page(
     accessible = await permission_service.accessible_kb_ids(session, user)
     if page.kb_id not in accessible:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="no access")
-    return await _build_detail(session, page, accessible)
+    fav = await favorite_repo.exists(session, user_id=user.id, page_id=page.id)
+    return await _build_detail(session, page, accessible, is_favorited=fav)
