@@ -172,12 +172,12 @@ export default function KbPagesPage() {
       <form onSubmit={upload} className="card mb-5 flex flex-wrap items-center gap-3 p-4">
         <label className="btn-ghost cursor-pointer">
           <Upload className="h-4 w-4" /> 选择文件
-          <input ref={fileRef} type="file" accept=".md,.txt,.pdf" className="hidden" />
+          <input ref={fileRef} type="file" accept=".md,.txt,.pdf,.docx,.html,.htm" className="hidden" />
         </label>
         <button className="btn-primary" disabled={uploading}>
           {uploading ? "上传中…" : "上传并摄入"}
         </button>
-        <span className="text-xs text-ink-faint">支持 .md / .txt / .pdf，LLM 自动编译成 wiki 页</span>
+        <span className="text-xs text-ink-faint">支持 .md / .txt / .pdf / .docx / .html，LLM 自动编译成 wiki 页</span>
       </form>
       {err && <p className="mb-3 text-red-600">{err}</p>}
 

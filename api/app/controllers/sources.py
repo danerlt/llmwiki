@@ -15,7 +15,7 @@ from app.worker.queue import enqueue_ingest
 
 router = APIRouter(tags=["sources"])
 
-_ALLOWED_EXTS = (".md", ".txt", ".pdf")
+_ALLOWED_EXTS = (".md", ".txt", ".pdf", ".docx", ".html", ".htm")
 
 
 async def _enqueue_or_fail(session: AsyncSession, source_id: uuid.UUID) -> None:
@@ -60,7 +60,8 @@ async def upload_source(
     filename = file.filename or "upload.bin"
     if not any(filename.lower().endswith(ext) for ext in _ALLOWED_EXTS):
         raise HTTPException(
-            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, detail="仅支持 .md/.txt/.pdf"
+            status_code=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE,
+            detail="仅支持 .md/.txt/.pdf/.docx/.html",
         )
     # 分块读取并随读随校验大小：超限立即中止，避免把超大请求体整体读入内存/临时盘（DoS）
     buf = bytearray()

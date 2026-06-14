@@ -40,6 +40,31 @@ def test_parse_unknown_falls_back_to_utf8():
     assert parse_to_text("a.bin", "application/octet-stream", b"raw") == "raw"
 
 
+def test_parse_html_strips_tags_and_scripts():
+    html = (
+        "<html><head><style>.x{color:red}</style></head>"
+        "<body><h1>标题</h1><p>正文内容</p>"
+        "<script>alert('x')</script></body></html>"
+    ).encode()
+    text = parse_to_text("a.html", "text/html", html)
+    assert "标题" in text and "正文内容" in text
+    assert "alert" not in text and "color:red" not in text  # script/style 被剔除
+
+
+def test_parse_docx_extracts_paragraphs():
+    import io
+
+    from docx import Document
+
+    doc = Document()
+    doc.add_paragraph("第一段")
+    doc.add_paragraph("第二段")
+    buf = io.BytesIO()
+    doc.save(buf)
+    text = parse_to_text("a.docx", "", buf.getvalue())
+    assert "第一段" in text and "第二段" in text
+
+
 def test_slugify():
     assert slugify("Hello World") == "hello-world"
     assert slugify("技术部") == "技术部"  # 中文保留
