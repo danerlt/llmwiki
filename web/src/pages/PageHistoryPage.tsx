@@ -1,11 +1,12 @@
 import { useEffect, useState } from "react";
-import { History, RotateCcw } from "lucide-react";
+import { GitCompare, History, RotateCcw } from "lucide-react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { apiFetch, postJson } from "../api/client";
 import type { PageDetail, PageVersion } from "../api/types";
 import Markdown from "../components/Markdown";
 import { EmptyState, PageHeader, Spinner } from "../components/ui";
+import { lineDiff } from "../lib/linediff";
 
 function unwrap(md: string): string {
   return md.replace(/\[\[([^\]]+)\]\]/g, "$1");
@@ -18,6 +19,7 @@ export default function PageHistoryPage() {
   const [versions, setVersions] = useState<PageVersion[] | null>(null);
   const [selected, setSelected] = useState<number | null>(null);
   const [reverting, setReverting] = useState(false);
+  const [showDiff, setShowDiff] = useState(false);
 
   useEffect(() => {
     apiFetch<PageDetail>(`/pages/${pageId}`).then(setPage).catch(() => {});
@@ -41,7 +43,9 @@ export default function PageHistoryPage() {
   }
 
   if (!versions) return <Spinner />;
-  const current = versions.find((v) => v.version_no === selected) ?? null;
+  const idx = versions.findIndex((v) => v.version_no === selected);
+  const current = idx >= 0 ? versions[idx] : null;
+  const prev = idx >= 0 && idx + 1 < versions.length ? versions[idx + 1] : null; // 更旧的一版
 
   return (
     <div>
@@ -92,16 +96,46 @@ export default function PageHistoryPage() {
                     <span className="font-mono text-accent">v{current.version_no}</span>{" "}
                     {current.title}
                   </span>
-                  <button
-                    onClick={() => revert(current.version_no)}
-                    disabled={reverting}
-                    className="btn-ghost"
-                  >
-                    <RotateCcw className="h-4 w-4" /> 回滚到此版本
-                  </button>
+                  <div className="flex items-center gap-2">
+                    {prev && (
+                      <button
+                        onClick={() => setShowDiff((s) => !s)}
+                        className={`btn-ghost ${showDiff ? "text-accent-dark" : ""}`}
+                      >
+                        <GitCompare className="h-4 w-4" /> {showDiff ? "看全文" : "对比上一版"}
+                      </button>
+                    )}
+                    <button
+                      onClick={() => revert(current.version_no)}
+                      disabled={reverting}
+                      className="btn-ghost"
+                    >
+                      <RotateCcw className="h-4 w-4" /> 回滚到此版本
+                    </button>
+                  </div>
                 </div>
                 <div className="card p-7">
-                  <Markdown content={unwrap(current.content_md)} />
+                  {showDiff && prev ? (
+                    <pre className="overflow-auto whitespace-pre-wrap font-mono text-sm leading-relaxed">
+                      {lineDiff(prev.content_md, current.content_md).map((l, k) => (
+                        <div
+                          key={k}
+                          className={
+                            l.type === "add"
+                              ? "bg-emerald-50 text-emerald-700"
+                              : l.type === "del"
+                                ? "bg-red-50 text-red-600 line-through"
+                                : "text-ink-muted"
+                          }
+                        >
+                          {l.type === "add" ? "+ " : l.type === "del" ? "- " : "  "}
+                          {l.text || " "}
+                        </div>
+                      ))}
+                    </pre>
+                  ) : (
+                    <Markdown content={unwrap(current.content_md)} />
+                  )}
                 </div>
               </>
             )}
