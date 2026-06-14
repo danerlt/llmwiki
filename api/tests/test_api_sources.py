@@ -175,6 +175,56 @@ async def test_upload_rejects_oversize_file(session, client, monkeypatch):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_download_source_returns_original_file(session, client):
+    user, kb = await _setup_user_kb(session)
+    src = await source_repo.create(
+        session, kb_id=kb.id, uploader_id=user.id, filename="原文档.md",
+        content_type="text/markdown", storage_key="kb/x/doc.md",
+    )
+    await session.commit()
+    storage = FakeStorage()
+    storage.objects["kb/x/doc.md"] = b"# original markdown body"
+    app.dependency_overrides[sources_ctrl.get_storage] = lambda: storage
+    app.dependency_overrides[get_current_user] = lambda: user
+    try:
+        r = await client.get(f"/api/sources/{src.id}/download")
+        assert r.status_code == 200
+        assert r.content == b"# original markdown body"  # 原始字节
+        assert "filename" in r.headers.get("content-disposition", "")  # 带文件名(RFC5987)
+    finally:
+        app.dependency_overrides.pop(sources_ctrl.get_storage, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+
+async def test_download_source_forbidden_without_access(session, client):
+    from app.repositories import org_repo
+
+    dept = await org_repo.create_department(session, name="密室部", parent_id=None)
+    await session.flush()
+    owner = await org_service.create_user(
+        session, email="owner@x.com", password="pw123456", display_name="Owner",
+        role="user", department_id=dept.id,
+    )
+    dkb = await kb_repo.create(session, scope_type="department", scope_ref_id=dept.id, name="密室库")
+    await session.flush()
+    src = await source_repo.create(
+        session, kb_id=dkb.id, uploader_id=owner.id, filename="secret.md",
+        content_type="text/markdown", storage_key="k",
+    )
+    outsider = await org_service.create_user(  # 无部门, 看不到密室库
+        session, email="outsider@x.com", password="pw123456", display_name="Out", role="user"
+    )
+    await session.commit()
+    app.dependency_overrides[sources_ctrl.get_storage] = lambda: FakeStorage()
+    app.dependency_overrides[get_current_user] = lambda: outsider
+    try:
+        r = await client.get(f"/api/sources/{src.id}/download")
+        assert r.status_code == 403
+    finally:
+        app.dependency_overrides.pop(sources_ctrl.get_storage, None)
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_upload_rejects_empty_file(session, client):
     user, kb = await _setup_user_kb(session)
     await session.commit()

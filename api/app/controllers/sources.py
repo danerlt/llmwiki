@@ -1,6 +1,8 @@
 import uuid
+from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, UploadFile
+from fastapi.responses import Response as FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.common.api_response import api_response
@@ -66,3 +68,19 @@ async def reingest_source(
     session: AsyncSession = Depends(get_db),
 ):
     return await source_service.reingest(session, user, source_id)
+
+
+@router.get("/sources/{source_id}/download")
+async def download_source(
+    source_id: uuid.UUID,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    storage: StorageBackend = Depends(get_storage),
+):
+    """查看/下载源的原始上传文件（读权限）。inline 让浏览器尽量内联预览(md/pdf/txt)。"""
+    data, filename, content_type = await source_service.get_file(session, user, source_id, storage)
+    return FileResponse(
+        content=data,
+        media_type=content_type,
+        headers={"Content-Disposition": f"inline; filename*=UTF-8''{quote(filename)}"},
+    )

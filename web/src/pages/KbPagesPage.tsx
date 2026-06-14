@@ -132,6 +132,29 @@ export default function KbPagesPage() {
     }
   }
 
+  // 查看原文件：带鉴权拉取原始上传文件，转 blob 后在新标签内联预览/下载
+  async function viewSource(id: string) {
+    try {
+      const res = await fetch(`/api/sources/${id}/download`, {
+        headers: { Authorization: `Bearer ${getToken()}` },
+      });
+      if (res.status === 401) {
+        setToken(null);
+        location.assign("/login");
+        return;
+      }
+      if (!res.ok) {
+        setErr("打开原文件失败");
+        return;
+      }
+      const url = URL.createObjectURL(await res.blob());
+      window.open(url, "_blank", "noopener");
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+    } catch {
+      setErr("网络异常，请重试");
+    }
+  }
+
   const groups = PT_ORDER.map((t) => ({
     t,
     items: (pages ?? []).filter((p) => p.page_type === t),
@@ -193,7 +216,14 @@ export default function KbPagesPage() {
             {sources.map((s) => (
               <div key={s.id} className="flex items-center gap-3 px-4 py-2.5 text-sm">
                 <FileText className="h-4 w-4 shrink-0 text-ink-faint" />
-                <span className="flex-1 truncate text-ink">{s.filename}</span>
+                <button
+                  type="button"
+                  onClick={() => viewSource(s.id)}
+                  className="flex-1 truncate text-left text-ink transition hover:text-accent-dark hover:underline"
+                  title="查看原文件"
+                >
+                  {s.filename}
+                </button>
                 {s.error && (
                   <span className="hidden max-w-[16rem] truncate text-xs text-red-500 sm:inline" title={s.error}>
                     {s.error}

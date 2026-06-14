@@ -133,5 +133,17 @@ class SourceService:
         await self._enqueue_or_fail(session, source_id)
         return SourceOut.model_validate(src)
 
+    async def get_file(
+        self, session: AsyncSession, user: User, source_id: uuid.UUID, storage: StorageBackend
+    ) -> tuple[bytes, str, str]:
+        """读取源的原始上传文件（读权限）。返回 (字节, 文件名, content_type)，供查看/下载。"""
+        src = await source_repo.get_by_id(session, source_id)
+        if src is None:
+            raise NotFoundException("source not found")
+        if src.kb_id not in await permission_service.accessible_kb_ids(session, user):
+            raise ForbiddenException("no access")
+        data = storage.get(src.storage_key)
+        return data, src.filename, src.content_type
+
 
 source_service = SourceService()
