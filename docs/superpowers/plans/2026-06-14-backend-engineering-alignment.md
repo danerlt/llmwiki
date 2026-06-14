@@ -62,7 +62,7 @@
 2. `main.py` 注册 `register_exception(app)`；保留现有兜底 handler 行为并纳入统一信封。
 3. 前端：`web/src/api/types.ts` 加 `ApiResponse<T>` + `BusinessError`；`web/src/api/client.ts` 单点拆包（success→data，false→抛 BusinessError，保留 401 刷新）；`client.test.ts` 更新。
 4. 灰度：接入 1 个资源验证全链路。
-**状态**：未开始
+**状态**：✅ 已完成（app/common: Response[T]/ErrorCode+AppException 树/@api_response/register_exception；main.py 注册，存量 HTTPException 与兜底行为不变；灰度 GET /api/kbs 走 Response[list[KBOut]]；前端 client.ts 单点拆包+BusinessError+ApiResponse 类型。后端 165 passed、前端 10 passed+build 绿）
 
 ## 阶段 4：数据访问层重构（BaseCrud + 类 + 单例）
 
