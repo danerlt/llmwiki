@@ -86,7 +86,7 @@
 ### 阶段 8：外部集成与多租户 🚧
 **目标**：从孤岛变成企业事件枢纽，并支撑多客户 SaaS。
 - 🚧 对外 REST API + API Key/服务账号 ✅ + Webhook 出站事件订阅 ✅(HMAC 签名, 页面更新/评论推送)
-- ⬜ 多租户隔离层（organization/tenant）
+- ❌ 多租户隔离层（organization/tenant）—— 老板定为【单租户企业内部署】，不做
 - ⬜ 更多数据源：docx/pptx/xlsx/html/网页抓取/Confluence 导入；扫描件 OCR
 - 🚧 CI/CD 流水线 ✅(GitHub Actions: 后端 pytest + 前端 build/test, push/PR) / ⬜ 真实 PG 集成测试(消除 SQLite↔PG 漂移)
 
@@ -94,14 +94,20 @@
 
 ## 剩余工作与阻塞项（诚实小结）
 
-**已成体系**：阶段 1–4 核心全部完成；阶段 5/6/7/8 主干完成。后端 143 测试 + 前端 7 全绿，全栈在线。
+**已成体系**：阶段 1–4 全部完成；阶段 5/6/7/8 主干完成。后端 151 测试 + 前端 7 全绿，全栈在线。
+
+**老板已拍板的方向**：
+- 向量检索 = 本地 sentence-transformers；部署 = 单租户企业内（不做多租户隔离层 → 该项移出待办）。
+
+**向量检索激活步骤（代码已完整、默认关闭、不依赖 torch 即可测试/运行）**：
+1. 安装 ML 依赖（作为可选 extra，避免拖累 CI/基础镜像）：`uv add sentence-transformers` 或镜像内 `uv sync --extra ml`；
+2. 置 `EMBEDDINGS_ENABLED=true`（.env），首次会下载 all-MiniLM-L6-v2 模型；
+3. 对存量页回填向量：`POST /api/admin/embeddings/reindex`（admin）；
+4. 之后摄入自动写向量，检索走关键词+向量混合。
 
 **可继续自主推进（无外部依赖）**：
-- 过期复审提醒；自定义角色/页级共享；更多源类型(docx/html)；i18n(大前端)；CI/CD
-- 搜索无果词记录（知识空缺）；个性化推荐；i18n（大前端重构）
-- 被遗忘权（账号级联删除）；备份/恢复脚本；CI/CD（GitHub Actions + 真实 PG 集成测试）
+- 自定义角色/页级共享；更多源类型(docx/html)；i18n（大前端重构）
+- 搜索无果词记录（知识空缺）；个性化推荐；被遗忘权（账号级联删除）；备份/恢复；真实 PG 集成测试
 
-**需老板拍板才能落地（阻塞，不擅自决定）**：
-- **向量/混合语义检索**：DeepSeek 无 embedding 接口。需二选一——(A) 接 OpenAI/智谱等 embedding API（需 key + 成本）；(B) 本地 sentence-transformers（引入 ~2GB torch，镜像与内存显著变重）。请指定方案。
-- **SSO（OIDC/SAML）+ SCIM**：需提供企业 IdP（如 Azure AD/Okta/Keycloak）的对接信息才能联调。
-- **多租户隔离层**：是否做成多客户 SaaS 硬隔离？这是较大的架构改造，需确认目标部署形态。
+**需老板提供外部系统才能联调**：
+- **SSO（OIDC/SAML）+ SCIM**：需企业 IdP（Azure AD/Okta/Keycloak）的对接信息。
