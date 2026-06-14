@@ -1,5 +1,6 @@
 import uuid
 
+import app.worker.queue as queue_mod
 from app.controllers import sources as sources_ctrl
 from app.core.deps import get_current_user
 from app.main import app
@@ -31,7 +32,7 @@ async def test_upload_creates_pending_source(session, client):
         enqueued.append(source_id)
         return "job-xyz"
 
-    sources_ctrl.enqueue_ingest = _fake_enqueue  # monkeypatch 入队
+    queue_mod.enqueue_ingest = _fake_enqueue  # monkeypatch 入队
     try:
         r = await client.post(
             f"/api/kbs/{kb.id}/sources",
@@ -56,12 +57,12 @@ async def test_upload_enqueue_failure_marks_source_failed(session, client):
     await session.commit()
     app.dependency_overrides[sources_ctrl.get_storage] = lambda: FakeStorage()
     app.dependency_overrides[get_current_user] = lambda: user
-    orig = sources_ctrl.enqueue_ingest
+    orig = queue_mod.enqueue_ingest
 
     async def _boom(source_id: str) -> str:
         raise RuntimeError("redis down")
 
-    sources_ctrl.enqueue_ingest = _boom
+    queue_mod.enqueue_ingest = _boom
     try:
         r = await client.post(
             f"/api/kbs/{kb.id}/sources",
@@ -72,7 +73,7 @@ async def test_upload_enqueue_failure_marks_source_failed(session, client):
         srcs = await source_repo.list_by_kb(session, kb.id)
         assert len(srcs) == 1 and srcs[0].status == "failed"
     finally:
-        sources_ctrl.enqueue_ingest = orig
+        queue_mod.enqueue_ingest = orig
         app.dependency_overrides.pop(sources_ctrl.get_storage, None)
         app.dependency_overrides.pop(get_current_user, None)
 
@@ -126,7 +127,7 @@ async def test_reingest_resets_status_and_enqueues(session, client):
         enqueued.append(source_id)
         return "job-re"
 
-    sources_ctrl.enqueue_ingest = _fake_enqueue
+    queue_mod.enqueue_ingest = _fake_enqueue
     app.dependency_overrides[get_current_user] = lambda: user
     try:
         r = await client.post(f"/api/sources/{src.id}/reingest")

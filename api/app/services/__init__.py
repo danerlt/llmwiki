@@ -6,7 +6,9 @@ from app.services.analytics_service import analytics_service
 from app.services.api_key_service import api_key_service
 from app.services.audit_service import audit_service
 from app.services.auth_service import auth_service
+from app.services.comment_service import comment_service
 from app.services.embedding_service import embedding_service
+from app.services.favorite_service import favorite_service
 from app.services.ingest_service import ingest_service
 from app.services.kb_service import kb_service
 from app.services.notification_service import notification_service
@@ -15,7 +17,10 @@ from app.services.permission_service import permission_service
 from app.services.promotion_service import promotion_service
 from app.services.query_service import query_service
 from app.services.retrieval_service import retrieval_service
+from app.services.source_service import source_service
+from app.services.stats_service import stats_service
 from app.services.webhook_service import webhook_service
+from app.services.wiki_service import wiki_service
 
 __all__ = [
     "activity_service",
@@ -23,7 +28,9 @@ __all__ = [
     "api_key_service",
     "audit_service",
     "auth_service",
+    "comment_service",
     "embedding_service",
+    "favorite_service",
     "ingest_service",
     "kb_service",
     "notification_service",
@@ -32,5 +39,8 @@ __all__ = [
     "promotion_service",
     "query_service",
     "retrieval_service",
+    "source_service",
+    "stats_service",
     "webhook_service",
+    "wiki_service",
 ]
