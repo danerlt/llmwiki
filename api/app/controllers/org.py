@@ -64,10 +64,12 @@ async def add_member(
     actor: User = Depends(require_admin),
     session: AsyncSession = Depends(get_db),
 ):
-    await org_repo.add_team_member(session, team_id=team_id, user_id=body.user_id)
+    await org_repo.add_team_member(
+        session, team_id=team_id, user_id=body.user_id, can_write=body.can_write
+    )
     await audit_service.record(session, actor_id=actor.id, action="team.add_member",
                                target_type="team", target_id=team_id,
-                               detail={"user_id": str(body.user_id)})
+                               detail={"user_id": str(body.user_id), "can_write": body.can_write})
     await session.commit()
     return {"status": "ok"}
 

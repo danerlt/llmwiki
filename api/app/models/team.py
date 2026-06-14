@@ -1,6 +1,6 @@
 import uuid
 
-from sqlalchemy import ForeignKey, String, Uuid
+from sqlalchemy import Boolean, ForeignKey, String, Uuid
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db.base import Base
@@ -18,3 +18,4 @@ class UserTeam(Base):
 
     user_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("users.id"), primary_key=True)
     team_id: Mapped[uuid.UUID] = mapped_column(Uuid, ForeignKey("teams.id"), primary_key=True)
+    can_write: Mapped[bool] = mapped_column(Boolean, default=True)  # False=只读成员

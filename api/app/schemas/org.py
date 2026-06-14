@@ -37,3 +37,4 @@ class UserCreate(BaseModel):
 
 class TeamMemberAdd(BaseModel):
     user_id: uuid.UUID
+    can_write: bool = True  # False=只读成员

@@ -52,11 +52,12 @@ async def can_write(session: AsyncSession, user: User, kb: KnowledgeBase) -> boo
         return kb.scope_ref_id == user.id
     if kb.scope_type == "team":
         res = await session.execute(
-            select(UserTeam).where(
+            select(UserTeam.can_write).where(
                 UserTeam.user_id == user.id, UserTeam.team_id == kb.scope_ref_id
             )
         )
-        return res.first() is not None
+        row = res.first()
+        return bool(row[0]) if row is not None else False  # 只读成员 can_write=False
     if kb.scope_type in ("department", "company"):
         return user.role == "admin"
     return False

@@ -81,3 +81,15 @@ async def test_can_write_rules(session, org):
     assert await permission_service.can_write(session, org["alice"], alice_kb) is True
     assert await permission_service.can_write(session, org["alice"], projx_kb) is True
     assert await permission_service.can_write(session, org["alice"], bob_kb) is False
+
+
+async def test_readonly_team_member_reads_but_cannot_write(session, org):
+    projx_kb = (await kb_repo.list_by_scope(session, "team", org["projx"].id))[0]
+    # bob 以只读身份加入项目X
+    await org_repo.add_team_member(
+        session, team_id=org["projx"].id, user_id=org["bob"].id, can_write=False
+    )
+    await session.flush()
+    names = await _kb_names(session, await permission_service.accessible_kb_ids(session, org["bob"]))
+    assert "项目X" in names  # 只读成员仍可见
+    assert await permission_service.can_write(session, org["bob"], projx_kb) is False  # 但不可写

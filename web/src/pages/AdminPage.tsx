@@ -71,8 +71,11 @@ export default function AdminPage() {
             teams={teams}
             users={users}
             onCreate={(name) => run(() => postJson("/teams", { name }), "团队已创建")}
-            onAddMember={(teamId, userId) =>
-              run(() => postJson(`/teams/${teamId}/members`, { user_id: userId }), "成员已加入")
+            onAddMember={(teamId, userId, canWrite) =>
+              run(
+                () => postJson(`/teams/${teamId}/members`, { user_id: userId, can_write: canWrite }),
+                "成员已加入",
+              )
             }
           />
         </Section>
@@ -179,11 +182,12 @@ function TeamForms({
   teams: Team[];
   users: UserOut[];
   onCreate: (name: string) => void;
-  onAddMember: (teamId: string, userId: string) => void;
+  onAddMember: (teamId: string, userId: string, canWrite: boolean) => void;
 }) {
   const [name, setName] = useState("");
   const [teamId, setTeamId] = useState("");
   const [userId, setUserId] = useState("");
+  const [readonly, setReadonly] = useState(false);
   return (
     <div className="space-y-2">
       <form
@@ -207,9 +211,9 @@ function TeamForms({
       <form
         onSubmit={(e) => {
           e.preventDefault();
-          if (teamId && userId) onAddMember(teamId, userId);
+          if (teamId && userId) onAddMember(teamId, userId, !readonly);
         }}
-        className="flex flex-wrap gap-2"
+        className="flex flex-wrap items-center gap-2"
       >
         <select className="field max-w-[10rem]" value={teamId} onChange={(e) => setTeamId(e.target.value)}>
           <option value="">选团队</option>
@@ -227,6 +231,10 @@ function TeamForms({
             </option>
           ))}
         </select>
+        <label className="flex items-center gap-1.5 text-xs text-ink-muted">
+          <input type="checkbox" checked={readonly} onChange={(e) => setReadonly(e.target.checked)} />
+          只读
+        </label>
         <button className="btn-ghost">加入成员</button>
       </form>
     </div>

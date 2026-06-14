@@ -30,8 +30,10 @@ async def list_teams(session: AsyncSession) -> list[Team]:
     return list(res.scalars().all())
 
 
-async def add_team_member(session: AsyncSession, *, team_id: uuid.UUID, user_id: uuid.UUID) -> None:
-    session.add(UserTeam(team_id=team_id, user_id=user_id))
+async def add_team_member(
+    session: AsyncSession, *, team_id: uuid.UUID, user_id: uuid.UUID, can_write: bool = True
+) -> None:
+    session.add(UserTeam(team_id=team_id, user_id=user_id, can_write=can_write))
 
 
 async def ancestor_department_ids(
