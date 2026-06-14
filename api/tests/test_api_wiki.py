@@ -152,6 +152,20 @@ async def test_delete_page(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_delete_page_with_comment_succeeds(session, client):
+    # 回归：删除带评论的页不应因外键冲突 500（delete_page 须连带清理评论）
+    admin, kb = await _admin_company_kb(session)
+    app.dependency_overrides[get_current_user] = lambda: admin
+    try:
+        pid = (
+            await client.post(f"/api/kbs/{kb.id}/pages", json={"title": "有评论", "slug": "wc"})
+        ).json()["id"]
+        await client.post(f"/api/pages/{pid}/comments", json={"body": "一条评论"})
+        assert (await client.delete(f"/api/pages/{pid}")).status_code == 204
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+
+
 async def test_get_page_hides_cross_kb_source_filenames(session, client):
     company = await kb_repo.create(session, scope_type="company", scope_ref_id=None, name="公司")
     await session.flush()

@@ -3,7 +3,7 @@ import uuid
 from sqlalchemy import delete, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import PageLink, PageVersion, WikiPage
+from app.models import Comment, PageLink, PageVersion, WikiPage
 
 
 async def get_by_slug(session: AsyncSession, kb_id: uuid.UUID, slug: str) -> WikiPage | None:
@@ -76,13 +76,14 @@ async def backfill_link_targets(session: AsyncSession, *, kb_id: uuid.UUID) -> N
 
 
 async def delete_page(session: AsyncSession, page_id: uuid.UUID) -> None:
-    """删除页及其相关链接（出链与入链）与历史版本，用于 reingest 清理孤儿页与人工删除。"""
+    """删除页及其相关链接（出链与入链）、历史版本与评论，用于 reingest 清理孤儿页与人工删除。"""
     await session.execute(
         delete(PageLink).where(
             or_(PageLink.from_page_id == page_id, PageLink.to_page_id == page_id)
         )
     )
     await session.execute(delete(PageVersion).where(PageVersion.page_id == page_id))
+    await session.execute(delete(Comment).where(Comment.page_id == page_id))
     await session.execute(delete(WikiPage).where(WikiPage.id == page_id))
 
 
