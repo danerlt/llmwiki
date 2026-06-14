@@ -36,9 +36,9 @@
 > 综合由主导 Claude 基于已恢复的盘点+5 视角+领域知识完成）。盘点确认现有 9 大能力域，并列出 16 项企业级缺口。
 > 排序原则：依赖关系 → 企业价值 → 落地成本。✅完成 / 🚧进行中 / ⬜未开始。
 
-### 阶段 2：平台基线与可运维性 🚧
+### 阶段 2：平台基线与可运维性 ✅（核心完成）
 **目标**：补齐企业采购“必查项”的 Web/运维基线，作为后续一切特性的地基。
-- 🚧 安全/运维中间件：✅安全响应头 ✅CORS ✅request_id 贯穿 / ⬜限流(rate limit) ⬜TrustedHost
+- ✅ 安全/运维中间件：安全响应头 + CORS + request_id 贯穿 + 限流(rate limit) + TrustedHost(按需)
 - ✅ 全局异常处理（统一错误体，不泄漏堆栈/SQL，带 request_id）✅ 结构化日志 + 请求访问日志（method/path/status/dur + request_id）
 - ✅ 深度健康检查：`/health`(存活) + `/readyz`(探 DB/Redis/MinIO 就绪，任一不通 503)
 - ✅ Prometheus `/metrics`（请求量 + 延迟 + LLM 调用数/token 计量）/ ⬜ 队列积压
