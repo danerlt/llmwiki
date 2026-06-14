@@ -2,8 +2,8 @@ import { useState, type FormEvent } from "react";
 import { ChevronDown, Quote, Sparkles } from "lucide-react";
 import { Link } from "react-router-dom";
 
-import { apiFetch, postJson } from "../api/client";
-import type { AnswerOut, PageDetail } from "../api/types";
+import { apiFetch, getToken, setToken } from "../api/client";
+import type { AnswerOut, Citation, PageDetail } from "../api/types";
 import Markdown from "../components/Markdown";
 import { PageHeader, Spinner } from "../components/ui";
 
@@ -17,18 +17,59 @@ export default function QueryPage() {
   const [question, setQuestion] = useState("");
   const [ans, setAns] = useState<AnswerOut | null>(null);
   const [loading, setLoading] = useState(false);
+  const [streaming, setStreaming] = useState(false);
   const [open, setOpen] = useState<Set<string>>(new Set());
   const [cache, setCache] = useState<Record<string, PageDetail>>({});
 
+  // SSE 流式问答：边生成边显示，结束时附引用来源
   async function ask(qText: string) {
     if (!qText.trim()) return;
     setLoading(true);
     setAns(null);
     setOpen(new Set());
     try {
-      setAns(await postJson<AnswerOut>("/query", { question: qText }));
+      const res = await fetch("/api/query/stream", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${getToken()}` },
+        body: JSON.stringify({ question: qText }),
+      });
+      if (res.status === 401) {
+        setToken(null);
+        location.assign("/login");
+        return;
+      }
+      if (!res.ok || !res.body) {
+        setAns({ answer: "（问答失败，请稍后重试）", citations: [] });
+        return;
+      }
+      setLoading(false);
+      setStreaming(true);
+      let answer = "";
+      let citations: Citation[] = [];
+      setAns({ answer: "", citations: [] });
+      const reader = res.body.getReader();
+      const decoder = new TextDecoder();
+      let buf = "";
+      for (;;) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buf += decoder.decode(value, { stream: true });
+        const parts = buf.split("\n\n");
+        buf = parts.pop() ?? "";
+        for (const part of parts) {
+          const line = part.trim();
+          if (!line.startsWith("data:")) continue;
+          const evt = JSON.parse(line.slice(5).trim());
+          if (evt.delta) answer += evt.delta as string;
+          if (evt.citations) citations = evt.citations as Citation[];
+          setAns({ answer, citations });
+        }
+      }
+    } catch {
+      setAns({ answer: "（问答失败，请稍后重试）", citations: [] });
     } finally {
       setLoading(false);
+      setStreaming(false);
     }
   }
   function onAsk(e: FormEvent) {
@@ -65,11 +106,11 @@ export default function QueryPage() {
           placeholder="提个问题，例如「后端用什么技术栈」"
           autoFocus
         />
-        <button className="btn-primary" disabled={loading}>
-          {loading ? "思考中…" : "提问"}
+        <button className="btn-primary" disabled={loading || streaming}>
+          {loading || streaming ? "生成中…" : "提问"}
         </button>
       </form>
-      {!ans && !loading && (
+      {!ans && !loading && !streaming && (
         <div className="mb-6 flex flex-wrap items-center gap-2">
           <span className="text-xs text-ink-faint">试试：</span>
           {EXAMPLES.map((q) => (
@@ -93,8 +134,9 @@ export default function QueryPage() {
           <div className="card p-6">
             <div className="mb-3 flex items-center gap-2 text-xs font-medium uppercase tracking-wider text-accent">
               <Sparkles className="h-3.5 w-3.5" /> 回答
+              {streaming && <span className="animate-pulse text-ink-faint">生成中…</span>}
             </div>
-            <Markdown content={ans.answer} />
+            <Markdown content={unwrap(ans.answer)} />
           </div>
           {ans.citations.length > 0 && (
             <div>

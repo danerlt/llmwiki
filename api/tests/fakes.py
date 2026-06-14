@@ -27,3 +27,10 @@ class FakeLLM:
     async def complete(self, system: str, user: str) -> str:
         self.calls.append((system, user))
         return self._responses.pop(0) if self._responses else ""
+
+    async def stream(self, system: str, user: str):
+        """逐字 yield 预设响应，模拟流式输出。"""
+        self.calls.append((system, user))
+        text = self._responses.pop(0) if self._responses else ""
+        for ch in text:
+            yield ch

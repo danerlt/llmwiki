@@ -1,4 +1,6 @@
 import asyncio
+import json
+from collections.abc import AsyncIterator
 
 import httpx
 
@@ -76,3 +78,37 @@ class LLMClient:
             if not isinstance(content, str):
                 raise ValueError(f"LLM 返回结构异常: {str(data)[:200]}")
             return content
+
+    async def stream(self, system: str, user: str) -> AsyncIterator[str]:
+        """流式生成：逐块 yield 文本增量（SSE delta.content）。失败中途抛出由调用方收尾。"""
+        async with httpx.AsyncClient(timeout=self.timeout, transport=self._transport) as client:
+            async with client.stream(
+                "POST",
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}"},
+                json={
+                    "model": self.model,
+                    "messages": [
+                        {"role": "system", "content": system},
+                        {"role": "user", "content": user},
+                    ],
+                    "temperature": 0,
+                    "stream": True,
+                },
+            ) as resp:
+                resp.raise_for_status()
+                metrics.observe_llm(0)  # 流式无 usage 回传，仅计调用次数
+                async for line in resp.aiter_lines():
+                    line = line.strip()
+                    if not line.startswith("data:"):
+                        continue
+                    payload = line[len("data:") :].strip()
+                    if payload == "[DONE]":
+                        break
+                    try:
+                        chunk = json.loads(payload)
+                        delta = chunk["choices"][0]["delta"].get("content")
+                    except (json.JSONDecodeError, KeyError, IndexError, TypeError):
+                        continue
+                    if delta:
+                        yield delta

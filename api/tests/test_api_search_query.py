@@ -52,6 +52,39 @@ async def test_query_rejects_overlong_question(session, client):
         app.dependency_overrides.pop(get_current_user, None)
 
 
+async def test_query_stream_emits_deltas_and_citations(session, client):
+    alice, backend_kb, frontend_kb = await _two_dept_kbs_with_pages(session)
+    await session.commit()
+    fake_llm = FakeLLM(["后端机密讲了后端内容[1]。"])
+    app.dependency_overrides[get_current_user] = lambda: alice
+    app.dependency_overrides[query_ctrl.get_llm] = lambda: fake_llm
+    try:
+        r = await client.post("/api/query/stream", json={"question": "后端"})
+        assert r.status_code == 200
+        assert "text/event-stream" in r.headers["content-type"]
+        body = r.text
+        assert "data:" in body
+        # 把所有 delta 拼起来应还原答案
+        import json as _json
+
+        deltas, citations = [], None
+        for line in body.splitlines():
+            if not line.startswith("data:"):
+                continue
+            evt = _json.loads(line[5:].strip())
+            if "delta" in evt:
+                deltas.append(evt["delta"])
+            if evt.get("done"):
+                citations = evt.get("citations")
+        assert "".join(deltas).startswith("后端机密")
+        assert citations is not None
+        cited_kbs = {c["kb_id"] for c in citations}
+        assert str(frontend_kb.id) not in cited_kbs  # 引用只来自可见 KB
+    finally:
+        app.dependency_overrides.pop(get_current_user, None)
+        app.dependency_overrides.pop(query_ctrl.get_llm, None)
+
+
 async def test_query_returns_answer_and_citations(session, client):
     alice, backend_kb, frontend_kb = await _two_dept_kbs_with_pages(session)
     await session.commit()

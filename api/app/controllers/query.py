@@ -1,4 +1,5 @@
 from fastapi import APIRouter, Depends
+from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import settings
@@ -27,4 +28,22 @@ async def query(
 ):
     return await query_service.answer(
         session, user, body.question, kb_scope=body.kb_scope, llm=llm
+    )
+
+
+@router.post("/query/stream")
+async def query_stream(
+    body: QueryRequest,
+    user: User = Depends(get_current_user),
+    session: AsyncSession = Depends(get_db),
+    llm: LLMClient = Depends(get_llm),
+):
+    """SSE 流式问答：回答边生成边推送，结束推送引用来源。"""
+    gen = query_service.answer_stream(
+        session, user, body.question, kb_scope=body.kb_scope, llm=llm
+    )
+    return StreamingResponse(
+        gen,
+        media_type="text/event-stream",
+        headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"},
     )
